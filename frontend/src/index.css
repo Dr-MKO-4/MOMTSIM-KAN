@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: "Fira Sans", Inter, system-ui, sans-serif;
+    background-color: #0F1117;
+    color: #E2E8F0;
+  }
+
+  code, pre, .mono {
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #1A1D27;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2D3348;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3B82F6;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-card border border-border rounded-xl p-5;
+  }
+
+  .btn-primary {
+    @apply bg-accent-blue hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg
+           transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply bg-bg-secondary hover:bg-bg-card border border-border text-text-primary
+           font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+  }
+
+  .btn-danger {
+    @apply bg-accent-fraud hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg
+           transition-colors duration-150;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-text-muted mb-1 uppercase tracking-wide;
+  }
+
+  .input {
+    @apply w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm
+           text-text-primary placeholder-text-dim focus:outline-none focus:border-border-focus
+           transition-colors duration-150;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-2xs font-mono font-medium;
+  }
+
+  .badge-blue  { @apply badge bg-blue-900/40 text-blue-300 border border-blue-800/50; }
+  .badge-green { @apply badge bg-green-900/40 text-green-300 border border-green-800/50; }
+  .badge-red   { @apply badge bg-red-900/40 text-red-300 border border-red-800/50; }
+  .badge-amber { @apply badge bg-amber-900/40 text-amber-300 border border-amber-800/50; }
+  .badge-gray  { @apply badge bg-slate-800/60 text-text-muted border border-border; }
+
+  .section-title {
+    @apply text-lg font-semibold text-text-primary mb-1;
+  }
+
+  .section-subtitle {
+    @apply text-sm text-text-muted mb-4;
+  }
+
+  .stat-value {
+    @apply text-2xl font-semibold font-mono text-text-primary;
+  }
+
+  .stat-label {
+    @apply text-xs text-text-muted uppercase tracking-wide mt-1;
+  }
+}
