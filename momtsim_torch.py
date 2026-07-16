@@ -334,7 +334,7 @@ class TorchMoMTSimEngine:
     # ------------------------------------------------------------------
     def run(self, n_steps: int = 720, verbose=True) -> pd.DataFrame:
         for step in range(n_steps):
-            n_tx_target = self.params.step_target_count[step]
+            n_tx_target = self.params.step_target_count[step % len(self.params.step_target_count)]
             n_tx_per_client = torch.distributions.Binomial(
                 total_count=n_tx_target.clamp(min=0),
                 probs=self.params.client_weight.clamp(0, 1)
@@ -425,6 +425,15 @@ class TorchFraudInjector:
         # File d'attente pour transactions différées (REFUND delay, mule→récepteur Smurfing)
         self._pending: list = []
 
+        # Tracking par scénario — alimenté par chaque _run_* pour export_fraudster_summary()
+        self._tracking: dict = {
+            "ato":              [],   # {step, victim, n_mules, total_amount}
+            "refund":           [],   # {step, fraudster, merchant, amount, delay_hours}
+            "fake_credentials": [],   # {step_activation, cid, dormance_hours, amount}
+            "split_deposit":    [],   # {step, agent, client, n_frags, total_amount}
+            "smurfing":         [],   # {step, emitter, n_mules, receiver, total_x}
+        }
+
         # Refund Fraud : un fraudeur persistant, liste ordonnée de marchands vulnérables,
         # compteur de cycles par marchand (non global)
         vuln_mask = engine.merchant_refund_proba.cpu().numpy() > self.cfg["refund"]["p_refund_threshold"]
@@ -487,6 +496,7 @@ class TorchFraudInjector:
         n = int(self.gen.integers(c["n_min"], c["n_max"] + 1))
         chosen_mules = self.gen.choice(self.mule_ids, size=min(n, len(self.mule_ids)), replace=False)
         remaining = B0
+        total_exfil = 0.0
         for mule in chosen_mules:
             if remaining <= 0:
                 break
@@ -496,6 +506,12 @@ class TorchFraudInjector:
                 continue
             self._log(step, "TRANSFER", amount, victim, int(mule), "ATO")
             remaining -= amount
+            total_exfil += amount
+        if total_exfil > 0:
+            self._tracking["ato"].append({
+                "step": step, "victim": victim,
+                "n_mules": len(chosen_mules), "total_amount": total_exfil,
+            })
 
     # ------------------------------------------------------------------
     # 3.2.2 — Refund Fraud
@@ -522,6 +538,10 @@ class TorchFraudInjector:
         delay = int(self.gen.integers(c["delay_min_hours"], c["delay_max_hours"] + 1))
         self._pending.append((step + delay, "REFUND", amount, merchant,
                                self._refund_fraudster, "REFUND", False))
+        self._tracking["refund"].append({
+            "step": step, "fraudster": self._refund_fraudster,
+            "merchant": merchant, "amount": amount, "delay_hours": delay,
+        })
 
         # Compteur par marchand (k_max cycles avant de passer au marchand suivant)
         self._refund_cycle_count += 1
@@ -540,7 +560,8 @@ class TorchFraudInjector:
                 dormance_h = int(self.gen.integers(c["dormance_min_days"] * 24,
                                                     c["dormance_max_days"] * 24))
                 self._fake_cred_agents[cid] = {
-                    "dormant_until": step + dormance_h, "n_leg_done": 0,
+                    "dormant_until": step + dormance_h, "dormance_h": dormance_h,
+                    "n_leg_done": 0,
                     "n_leg_target": int(self.gen.integers(c["n_leg_min"], c["n_leg_max"] + 1)),
                     "activated": False,
                 }
@@ -563,6 +584,11 @@ class TorchFraudInjector:
                 amount = float(self.gen.uniform(c["m_exp_ratio_min"] * plafond, plafond))
                 # is_flagged=False : le KYC n'a pas détecté l'usurpation — c'est l'essence du scénario
                 self._log(step, "TRANSFER", amount, cid, dest, "FAKE_CRED", flagged=False)
+                self._tracking["fake_credentials"].append({
+                    "step_activation": step, "cid": cid,
+                    "dormance_hours": state.get("dormance_h", 0),
+                    "amount": amount,
+                })
                 state["activated"] = True
 
     # ------------------------------------------------------------------
@@ -610,6 +636,11 @@ class TorchFraudInjector:
         fragments = self._optimal_fragmentation(total_deposit)
         for frag in fragments:
             self._log(step, "CASH_IN", frag, agent, client, "SPLIT_DEP")
+        self._tracking["split_deposit"].append({
+            "step": step, "agent": agent, "client": client,
+            "n_frags": len(fragments), "total_amount": total_deposit,
+            "fragments": [float(f) for f in fragments],
+        })
 
     # ------------------------------------------------------------------
     # 3.2.5 — Smurfing (Zhdanova et al.)
@@ -625,28 +656,47 @@ class TorchFraudInjector:
             interval = (c["operation_interval_days"] * 24) / max(smurf_mult, 1e-3)
             net["next_op_step"] = step + max(1, int(self.gen.normal(interval, 24)))
 
-            total_X = float(self.gen.uniform(500000, 5000000))
             emitter_balance = float(self.engine.balance[net["emitter"]].item())
-            if emitter_balance < total_X:
+            s_seuil = c["S_seuil"]
+
+            # total_X ∝ solde courant de l'émetteur (40–80 %), indépendant de l'échelle FCFA.
+            # L'ancienne borne U(500 000, 5 000 000) supposait des soldes > 500 000 FCFA,
+            # ce qui n'est jamais atteint avec la distribution initiale calibrée → smurfing
+            # ne déclenchait jamais et delta_commission_ratio restait NaN dans featuresLog.
+            total_X = emitter_balance * float(self.gen.uniform(0.4, 0.8))
+            # Seuil minimal : au moins 2 fragments à ≥ 70 % du seuil COBAC simulé
+            frag_min_viable = 2 * 0.70 * s_seuil
+            if total_X < frag_min_viable or emitter_balance < frag_min_viable:
+                # Adapter le seuil de référence à l'échelle du solde si besoin
+                s_seuil = emitter_balance / (2 * 0.70 * 2)  # 4 demi-fragments
+                total_X = emitter_balance * float(self.gen.uniform(0.4, 0.8))
+            if total_X < 1.0:
                 continue
 
-            s_seuil = c["S_seuil"]
             k = int(self.gen.integers(2, len(net["mules"]) + 1))
             chosen = self.gen.choice(net["mules"], size=min(k, len(net["mules"])), replace=False)
             # x_i ~ U(0.70·S, 0.99·S) indépendants, renormalisés pour respecter total_X
             raw = self.gen.uniform(0.70 * s_seuil, 0.99 * s_seuil, size=len(chosen))
             fractions = raw / raw.sum() * min(total_X, len(chosen) * 0.99 * s_seuil)
 
+            total_emitted = 0.0
             for mule, x_i in zip(chosen, fractions):
                 # Émetteur → mule (immédiat)
                 self._log(step, "TRANSFER", float(x_i), net["emitter"], int(mule), "SMURFING")
                 delta_i = self.gen.uniform(c["delta_min"], c["delta_max"])
                 amount_out = float(x_i) * (1 - delta_i)
+                total_emitted += float(x_i)
                 # Mule → récepteur différé : Δt_mule ~ U(2h, 24h) (eq. 3.2.5)
                 delay_mule = int(self.gen.integers(c["delay_mule_min_hours"],
                                                     c["delay_mule_max_hours"] + 1))
                 self._pending.append((step + delay_mule, "TRANSFER", amount_out,
                                        int(mule), net["receiver"], "SMURFING", False))
+            if total_emitted > 0:
+                self._tracking["smurfing"].append({
+                    "step": step, "emitter": net["emitter"],
+                    "n_mules": len(chosen), "receiver": net["receiver"],
+                    "total_x": total_emitted,
+                })
 
     # ------------------------------------------------------------------
     def inject(self, step: int):
@@ -662,6 +712,37 @@ class TorchFraudInjector:
         if self.gen.uniform() < self.probas["split_deposit"]:
             self._run_split_deposit(step)
         self._run_smurfing(step)
+
+    def get_tracking(self) -> dict:
+        """Retourne le dictionnaire de suivi des opérations frauduleuses."""
+        return self._tracking
+
+    def export_fraudster_summary(self) -> "pd.DataFrame":
+        """Consolide le tracking en DataFrame (une ligne par opération frauduleuse)."""
+        rows = []
+        for ev in self._tracking["ato"]:
+            rows.append({"scenario": "ATO", "step": ev["step"],
+                         "actor": ev["victim"], "n_targets": ev["n_mules"],
+                         "amount": ev["total_amount"]})
+        for ev in self._tracking["refund"]:
+            rows.append({"scenario": "REFUND", "step": ev["step"],
+                         "actor": ev["fraudster"], "n_targets": 1,
+                         "amount": ev["amount"]})
+        for ev in self._tracking["fake_credentials"]:
+            rows.append({"scenario": "FAKE_CRED", "step": ev["step_activation"],
+                         "actor": ev["cid"], "n_targets": 1,
+                         "amount": ev["amount"]})
+        for ev in self._tracking["split_deposit"]:
+            rows.append({"scenario": "SPLIT_DEP", "step": ev["step"],
+                         "actor": ev["agent"], "n_targets": ev["n_frags"],
+                         "amount": ev["total_amount"]})
+        for ev in self._tracking["smurfing"]:
+            rows.append({"scenario": "SMURFING", "step": ev["step"],
+                         "actor": ev["emitter"], "n_targets": ev["n_mules"],
+                         "amount": ev["total_x"]})
+        if not rows:
+            return pd.DataFrame(columns=["scenario", "step", "actor", "n_targets", "amount"])
+        return pd.DataFrame(rows)
 
 
 if __name__ == "__main__":

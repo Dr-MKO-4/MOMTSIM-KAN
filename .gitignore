@@ -30,6 +30,14 @@ env/
 frontend/node_modules/
 frontend/dist/
 frontend/.vite/
+electron/node_modules/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist-electron/
+
+# ── Données générées (runs, exports) ─────────────────────────────────────────
+runs/
+fraudsters.csv
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store

@@ -15,9 +15,14 @@ class FeatureEngineer:
     ρ_rupture, ρ_refund, V1h, Flag_nuit, ρ_nouveau.
     """
 
-    def __init__(self, df: pd.DataFrame, eps: float = 1e-6):
+    def __init__(self, df: pd.DataFrame, eps: float = 1e-6, mule_tolerance_steps: int = 48):
         self.df = df.copy().sort_values(["step"]).reset_index(drop=True)
         self.eps = eps
+        # Tolérance temporelle pour l'appariement mule (smurfing) :
+        # delay_mule_max_hours (= 24, section 3.2.5) × 2 = 48 steps (1 step = 1h).
+        # Le facteur ×2 absorbe les arrondis horaires du simulateur et correspond
+        # à une marge conservatrice sur la fenêtre U(2h, 24h) du mémoire.
+        self.mule_tolerance_steps = mule_tolerance_steps
 
     # ------------------------------------------------------------------
     def compute_all(self) -> pd.DataFrame:
@@ -107,10 +112,14 @@ class FeatureEngineer:
         in_tx = in_tx.sort_values(["account", "step_in"])
         out_tx = out_tx.sort_values(["account", "step_out"])
 
-        # appariement asof : pour chaque sortie, la dernière entrée précédente sur le même compte
+        # appariement asof : pour chaque sortie, la dernière entrée précédente sur le même compte,
+        # dans une fenêtre de mule_tolerance_steps (défaut 48h = delay_mule_max_hours × 2).
+        # Toute paire dont l'écart step_out − step_in dépasse cette tolérance est ignorée
+        # (NaN dans step_in) : le compte ne reçoit pas is_mule_candidate=True par coïncidence.
         merged = pd.merge_asof(
             out_tx.sort_values("step_out"), in_tx.sort_values("step_in"),
-            left_on="step_out", right_on="step_in", by="account", direction="backward")
+            left_on="step_out", right_on="step_in", by="account", direction="backward",
+            tolerance=self.mule_tolerance_steps)
         merged["delta"] = merged["amount_in"] - merged["amount_out"]
         merged["delta_ratio"] = merged["delta"] / (merged["amount_in"] + self.eps)
 
