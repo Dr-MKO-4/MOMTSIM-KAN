@@ -1,6 +1,7 @@
 import type {
   FraudConfig, SimulationParams, CalibrationParams,
   Job, HealthStatus, BackupEntry,
+  RunEntry, RunDetail, DataPage, FraudstersData,
 } from "../types/api";
 
 const BASE = "/api";
@@ -47,6 +48,27 @@ export const startCalibration = (params: CalibrationParams) =>
 
 // --- Health ---
 export const getHealth = () => request<HealthStatus>("/health");
+
+// --- Données paginées ---
+export const fetchRawDataPage = (page = 1, pageSize = 100, filterFraud = false) =>
+  request<DataPage>(`/data/raw?page=${page}&page_size=${pageSize}&filter_fraud=${filterFraud}`);
+
+export const fetchFeaturesDataPage = (page = 1, pageSize = 100, filterFraud = false) =>
+  request<DataPage>(`/data/features?page=${page}&page_size=${pageSize}&filter_fraud=${filterFraud}`);
+
+export const getFraudsters = () => request<FraudstersData>("/data/fraudsters");
+
+// --- Historique des runs ---
+export const listRuns = (runType?: string, limit = 50) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (runType) params.set("run_type", runType);
+  return request<RunEntry[]>(`/runs?${params}`);
+};
+
+export const getRun = (runId: string) => request<RunDetail>(`/runs/${runId}`);
+
+export const deleteRun = (runId: string) =>
+  request<{ deleted: string }>(`/runs/${runId}`, { method: "DELETE" });
 
 // --- Polling helper ---
 export function pollJob(

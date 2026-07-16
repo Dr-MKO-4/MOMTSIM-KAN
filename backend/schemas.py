@@ -93,12 +93,12 @@ class FraudConfig(BaseModel):
 # ---------------------------------------------------------------------------
 
 class SimulationParams(BaseModel):
-    n_clients: int = Field(2000, ge=100, le=10000)
+    n_clients: int = Field(2000, ge=100)
     n_merchants: int = Field(300, ge=10)
     n_banks: int = Field(20, ge=1)
     n_mules: int = Field(60, ge=0)
-    n_steps: int = Field(720, ge=24, le=8760)
-    max_slots: int = Field(6, ge=1, le=20)
+    n_steps: int = Field(720, ge=24)
+    max_slots: int = Field(6, ge=1)
     seed: int = Field(1000, ge=0)
     fraud_probas: Optional[dict[str, float]] = None
 

@@ -110,6 +110,7 @@ export interface SimulationResult {
   fraud_by_scenario: Record<string, number>;
   steps_run: number;
   csv_path: string;
+  plain_summary?: string;
   charts: Record<string, string>;
 }
 
@@ -131,6 +132,7 @@ export interface KANValidationResult {
   features_poor_coverage: string[];
   ks_per_feature: Record<string, number>;
   grid_coverage: Record<string, number>;
+  plain_summary?: string;
   charts: Record<string, string>;
 }
 
@@ -156,4 +158,50 @@ export interface BackupEntry {
   path: string;
   size: number;
   modified: string;
+}
+
+// ── BLOC C : Historique des runs ─────────────────────────────────────────
+
+export interface RunSummary {
+  n_transactions?: number;
+  fraud_rate?: number;
+  fraud_by_scenario?: Record<string, number>;
+  n_rows?: number;
+  n_features?: number;
+  decision?: string;
+  VE2?: number;
+  J_Fisher?: number;
+  D_KS_mean?: number;
+  sse_final?: number;
+  converged?: boolean;
+  plain_summary?: string;
+}
+
+export interface RunEntry {
+  id: string;
+  run_type: "simulation" | "features" | "kan" | "calibration";
+  timestamp: string;
+  folder: string;
+  summary: RunSummary;
+}
+
+export interface RunDetail extends RunEntry {
+  metadata: Record<string, unknown>;
+}
+
+// ── BLOC A5 : Données paginées ───────────────────────────────────────────
+
+export interface DataPage {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+}
+
+export interface FraudstersData {
+  total: number;
+  columns: string[];
+  rows: (string | number | null)[][];
 }

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MoMTSim</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: #0D0F18;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      color: #E2E8F0;
+      user-select: none;
+      -webkit-app-region: drag;
+    }
+
+    .logo {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.3em;
+      color: #3B82F6;
+      text-transform: uppercase;
+    }
+
+    .sub {
+      margin-top: 0.4rem;
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      color: #475569;
+      text-transform: uppercase;
+    }
+
+    .divider {
+      margin-top: 2rem;
+      width: 200px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #1E3A5F, transparent);
+    }
+
+    .spinner {
+      margin-top: 1.8rem;
+      width: 28px;
+      height: 28px;
+      border: 2px solid #1E293B;
+      border-top-color: #3B82F6;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .msg {
+      margin-top: 1rem;
+      font-size: 0.7rem;
+      color: #334155;
+      letter-spacing: 0.05em;
+    }
+
+    .version {
+      position: absolute;
+      bottom: 1rem;
+      font-size: 0.6rem;
+      color: #1E293B;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">MoMTSim</div>
+  <div class="sub">KAN &middot; CEMAC &middot; Fraude</div>
+  <div class="divider"></div>
+  <div class="spinner"></div>
+  <div class="msg">Démarrage du moteur de simulation…</div>
+  <div class="version">M2 Mémoire &mdash; 2025</div>
+</body>
+</html>

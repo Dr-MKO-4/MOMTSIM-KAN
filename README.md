@@ -5,23 +5,129 @@
 
 ---
 
-## Vue d'ensemble
+## Télécharger et installer (aucune connaissance technique requise)
 
-Ce dépôt contient l'implémentation complète du pipeline **MoMTSim-KAN** :
+**Windows 10 / 11 (64 bits) uniquement.**
 
-1. **Simulation multi-agents** d'un réseau Mobile Money (clients, marchands, banques, mules) avec injection de 5 scénarios de fraude calibrés sur données réelles CEMAC.
-2. **Ingénierie de 12 features** dérivées formellement dans le mémoire (éqs. 3.8–3.19).
-3. **Calibration SSE/SPSA** des probabilités de fraude (section 3.1.3).
-4. **Validation topologique KAN** via la *Quick Decision Rule* (éqs. 4.1–4.7 : VE₂, J\_Fisher, D\_KS, ρ\_coverage).
-5. **Dashboard interactif** FastAPI + React pour piloter le pipeline sans toucher au code.
+1. Allez dans l'onglet [**Releases**](../../releases) de ce dépôt GitHub
+2. Dans la dernière release, téléchargez le fichier **`MoMTSim-Setup-x64.exe`**
+3. Double-cliquez sur l'installeur, suivez les étapes (Suivant → Installer → Terminer)
+4. Lancez **MoMTSim** depuis le Bureau ou le menu Démarrer
+
+Une fenêtre s'ouvre directement — aucun navigateur, aucun serveur à démarrer.
+
+> **Note :** au premier lancement, Windows Defender peut afficher un avertissement  
+> « Application inconnue ». Cliquez sur **« Informations complémentaires »** puis  
+> **« Exécuter quand même »** — le logiciel n'est simplement pas encore signé numériquement.
+
+---
+
+## Utilisation de l'interface
+
+| Page | À quoi ça sert |
+|---|---|
+| **Tableau de bord** | Vue d'ensemble de l'état du pipeline |
+| **Configuration** | Régler les paramètres des scénarios de fraude |
+| **Simulation** | Générer les transactions synthétiques (rawLog) |
+| **Features** | Calculer les 12 indicateurs de détection de fraude |
+| **Validation KAN** | Tester si le réseau neuronal KAN est applicable |
+| **Calibration** | Ajuster automatiquement les taux de fraude |
+| **Historique** | Revoir les résultats des simulations précédentes |
+
+---
+
+## Installation depuis les sources (développeurs)
+
+### Prérequis
+
+| Outil | Version minimale | Téléchargement |
+|---|---|---|
+| Python | 3.10 | [python.org](https://www.python.org/downloads/) |
+| Node.js | 18 | [nodejs.org](https://nodejs.org/) |
+| Git | — | [git-scm.com](https://git-scm.com/) |
+
+### 1. Cloner le dépôt
+
+```bash
+git clone https://github.com/Dr-MKO-4/MOMTSIM-KAN.git
+cd MOMTSIM-KAN
+```
+
+### 2. Backend Python
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate        # Windows PowerShell
+pip install -r backend/requirements.txt
+```
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+cd ..
+```
+
+### 4. Lancer en mode développement
+
+**Terminal 1 — API (port 8000)**
+```bash
+.venv\Scripts\activate
+python start_backend.py
+```
+
+**Terminal 2 — UI (port 5173)**
+```bash
+cd frontend && npm run dev
+```
+
+L'interface s'ouvre sur `http://localhost:5173`.
+
+---
+
+## Construire l'installeur Windows
+
+Prérequis supplémentaires :
+```bash
+pip install pyinstaller
+cd electron && npm install && cd ..
+```
+
+Build complet (~ 10–20 min selon la taille de PyTorch) :
+```powershell
+.\build.ps1
+```
+
+Flags disponibles :
+```powershell
+.\build.ps1 -SkipFrontend      # si frontend/dist/ est déjà à jour
+.\build.ps1 -SkipPyInstaller   # si dist/momtsim_server/ est déjà à jour
+```
+
+L'installeur `.exe` est généré dans `dist-electron\`.
+
+---
+
+## Paramètres de simulation par défaut
+
+| Paramètre | Valeur par défaut |
+|---|---|
+| Clients | 2 000 |
+| Marchands | 300 |
+| Banques | 20 |
+| Mules | 60 |
+| Steps | 720 (= 30 jours × 24 h) |
+| Taux de fraude cible | 20 – 26 % |
+| Seed | 1 000 |
 
 ---
 
 ## Scénarios de fraude simulés
 
-| Code | Scénario | Section |
+| Code | Scénario | Section mémoire |
 |---|---|---|
-| `ATO` | Account Takeover — vide le compte en fragments | 3.2.1 |
+| `ATO` | Account Takeover — vide le compte en fragments via des mules | 3.2.1 |
 | `REFUND` | Refund Fraud — remboursement différé Δt ∼ U(1h, 48h) | 3.2.2 |
 | `FAKE_CRED` | Fake Credentials — dormance puis exploitation rapide | 3.2.3 |
 | `SPLIT_DEP` | Split Deposit — fragmentation sous seuil tarifaire | 3.2.4 |
@@ -29,184 +135,74 @@ Ce dépôt contient l'implémentation complète du pipeline **MoMTSim-KAN** :
 
 ---
 
-## Architecture du projet
+## Features calculées (section 3.2.6 — éqs. 3.8–3.19)
 
-```
-MOMTSIM/
-│
-├── momtsim_torch.py          # Moteur vectorisé PyTorch (TorchParameters, TorchMoMTSimEngine, TorchFraudInjector)
-├── features.py               # FeatureEngineer — 12 features vectorisées (O(n log n))
-├── calibration_sse.py        # SSEFraudCalibrator — SPSA sur SSE(Dr, Ds)
-├── viz.py                    # TopologyValidator + MoMTSimVisualizer (Plotly dark)
-├── main.py                   # CLI orchestrateur : --calibrate / --probas / --no-features
-├── start_backend.py          # Lance uvicorn sur le backend FastAPI
-│
-├── paramFiles/               # 6 CSV de paramètres (population, balances, profils clients…)
-│   ├── aggregatedTransactions.csv
-│   ├── clientsProfiles.csv
-│   ├── initialBalancesDistribution.csv
-│   ├── maxOccurrencesPerClient.csv
-│   ├── overdraftLimits.csv
-│   └── transactionsTypes.csv
-│
-├── fraudScenariosConfig.json # Config des 5 scénarios (éditable via dashboard)
-├── calibrated_probas.json    # Résultat de la calibration SPSA (θ*)
-│
-├── backend/                  # API FastAPI
-│   ├── api.py                # 11 endpoints REST + CORS
-│   ├── schemas.py            # Modèles Pydantic (FraudConfig, SimulationParams…)
-│   ├── config_manager.py     # R/W/backup/restore fraudScenariosConfig.json
-│   └── pipeline_runner.py    # Jobs async (threads) + store in-memory
-│
-├── frontend/                 # Dashboard React + Vite + TypeScript + Tailwind
-│   └── src/
-│       ├── pages/            # Dashboard, Config, Simulation, Features, KAN, Calibration
-│       ├── components/       # Layout, Sidebar, TopBar, JobTracker, PlotlyEmbed, StatCard
-│       ├── api/client.ts     # Toutes les requêtes + pollJob()
-│       └── types/api.ts      # Types TS miroirs des schémas Pydantic
-│
-├── momtsim_kan_pipeline.ipynb  # Notebook complet (exploration + prototypage)
-└── mémoire.tex                 # Source LaTeX du mémoire
-```
-
----
-
-## Démarrage rapide
-
-### Prérequis
-
-- Python ≥ 3.11 avec PyTorch, pandas, numpy, plotly, fastapi, uvicorn
-- Node.js ≥ 18 (pour le frontend)
-
-### Installation
-
-```bash
-# Backend
-pip install -r backend/requirements.txt
-
-# Frontend
-cd frontend
-npm install
-```
-
-### Lancer le pipeline en ligne de commande
-
-```bash
-# Simulation complète (probas calibrées chargées automatiquement)
-python main.py
-
-# Calibration SSE/SPSA puis simulation
-python main.py --calibrate
-
-# Simulation avec un fichier de probas spécifique
-python main.py --probas calibrated_probas.json
-
-# Simulation sans feature engineering
-python main.py --no-features
-```
-
-### Lancer le dashboard interactif
-
-```bash
-# Terminal 1 — API
-python start_backend.py
-# → http://127.0.0.1:8000/docs  (Swagger UI)
-
-# Terminal 2 — UI
-cd frontend && npm run dev
-# → http://localhost:5173
-```
-
----
-
-## Paramètres de simulation par défaut
-
-| Paramètre | Valeur |
+| Feature | Description |
 |---|---|
-| N\_clients | 2 000 |
-| N\_marchands | 300 |
-| N\_banques | 20 |
-| N\_mules | 60 |
-| N\_steps | 720 (= 30 jours × 24h) |
-| Taux de fraude cible | 20 – 26 % |
-| Seed | 1 000 |
+| `delta_B_orig` | Variation de solde côté émetteur |
+| `delta_B_dest` | Variation de solde côté destinataire |
+| `r1` | Montant / solde initial |
+| `r2` | Montant / solde final |
+| `flag_anomalie` | Anomalie sur fenêtre glissante de 10 transactions |
+| `delta_commission_ratio` | Commission mule Smurfing |
+| `var_agent_split` | Variance intra-agent Split Deposit |
+| `rho_rupture` | Rupture de comportement Fake Credentials |
+| `rho_refund` | Ratio remboursements / paiements |
+| `v1h` | Vélocité sur 1 heure |
+| `flag_nuit` | Transaction nocturne (22h–6h) |
+| `rho_nouveau` | Ratio destinataires inconnus (fenêtre 30 j) |
 
 ---
 
-## Features calculées (section 3.2.6)
-
-| Feature | Équation | Description |
-|---|---|---|
-| `delta_B_orig` | 3.8 | Variation solde émetteur |
-| `delta_B_dest` | 3.9 | Variation solde destinataire |
-| `r1` | 3.10 | Montant / solde initial |
-| `r2` | 3.11 | Montant / solde final |
-| `flag_anomalie` | 3.12 | Anomalie fenêtre 10 tx glissant |
-| `delta_commission_ratio` | 3.13 | Commission mule Smurfing |
-| `var_agent_split` | 3.14 | Variance intra-agent Split Deposit (ddof=0) |
-| `rho_rupture` | 3.15 | Rupture de comportement Fake Credentials |
-| `rho_refund` | 3.16 | Ratio remboursements / paiements |
-| `v1h` | 3.17 | Vélocité sur 1 heure |
-| `flag_nuit` | 3.18 | Transaction nocturne (22h–6h) |
-| `rho_nouveau` | 3.19 | Ratio destinataires inconnus (fenêtre 30j) |
-
----
-
-## Calibration SSE/SPSA
-
-Minimise θ\* = argmin Σ\_c Σ\_t (Dr(c,t) − Ds(c,t ; θ))² par l'algorithme SPSA
-(2 évaluations par itération, adapté aux simulations bruitées non différentiables).
-
-Les probabilités optimales sont sauvegardées dans `calibrated_probas.json` et
-chargées automatiquement par la simulation et le dashboard.
-
----
-
-## Validation topologique KAN (section 4.1)
-
-La *Quick Decision Rule* (éq. 4.7) combine 4 critères :
+## Validation topologique KAN (section 4.1 — Quick Decision Rule)
 
 | Critère | Seuil | Équation |
 |---|---|---|
 | VE₂ (variance expliquée PCA 2D) | ≥ 0.40 | 4.2–4.3 |
 | J\_Fisher (séparabilité LDA) | > 1 | 4.4 |
-| D̄\_KS (régularité distributions) | < 0.15 | 4.5 |
-| ρ\_coverage (couverture grille) | ∈ [0.8, 1.0] | 4.6 |
-
-**Décision :** KAN valide / Transformations requises / Architecture alternative.
+| D̄\_KS (régularité des distributions) | < 0.15 | 4.5 |
+| ρ\_coverage (couverture grille KAN) | ∈ [0.8, 1.0] | 4.6 |
 
 ---
 
-## Endpoints API
+## Architecture du projet
 
-| Méthode | Route | Description |
-|---|---|---|
-| GET | `/api/config` | Lire `fraudScenariosConfig.json` |
-| PUT | `/api/config` | Écrire + backup automatique |
-| GET | `/api/config/backups` | Liste des backups horodatés |
-| POST | `/api/config/restore/{name}` | Restaurer un backup |
-| GET | `/api/probas` | Probas calibrées courantes |
-| POST | `/api/simulate` | Lancer une simulation (job async) |
-| POST | `/api/features` | Lancer le feature engineering |
-| POST | `/api/kan/validate` | Lancer la validation KAN |
-| POST | `/api/calibrate` | Lancer la calibration SPSA |
-| GET | `/api/jobs/{job_id}` | Statut + résultat d'un job |
-| GET | `/api/health` | État des fichiers du pipeline |
+```
+MOMTSIM-KAN/
+├── backend/                  # API FastAPI
+│   ├── api.py                # Endpoints REST
+│   ├── pipeline_runner.py    # Jobs asynchrones
+│   ├── schemas.py            # Modèles Pydantic
+│   ├── config_manager.py     # Gestion config fraude
+│   ├── run_registry.py       # Historique SQLite
+│   └── requirements.txt
+├── frontend/                 # Interface React + Tailwind
+│   └── src/
+│       ├── pages/
+│       ├── components/
+│       ├── api/client.ts
+│       └── types/api.ts
+├── electron/                 # Packaging application desktop
+│   ├── main.js
+│   └── package.json
+├── paramFiles/               # Données de calibration CEMAC
+├── momtsim_torch.py          # Moteur de simulation (PyTorch)
+├── features.py               # Feature engineering
+├── viz.py                    # Visualisations Plotly
+├── calibration_sse.py        # Calibration SPSA
+├── run_server.py             # Point d'entrée production
+├── momtsim.spec              # Spec PyInstaller
+└── build.ps1                 # Script de build installeur
+```
 
 ---
 
 ## Contexte réglementaire
 
-Le seuil de déclaration COBAC/BEAC pour les transactions suspectes est fixé à
-**500 000 FCFA** (`S_seuil` dans la config Smurfing). Ce paramètre est modifiable
-directement depuis le dashboard.
+Le seuil de déclaration COBAC/BEAC pour les transactions suspectes est fixé à **500 000 FCFA** (`S_seuil` dans la config Smurfing). Ce paramètre est modifiable directement depuis la page Configuration du dashboard.
 
 ---
 
-## Fichiers ignorés par git
+## Licence
 
-- `MoMTSim_old/` — ancienne version non-torch (conservée localement)
-- `rawLog_torch.csv`, `featuresLog.csv` — sorties générées (reproductibles)
-- `viz_*.html` — figures Plotly exportées
-- `config_backups/` — backups locaux de configuration
-- `frontend/node_modules/`, `__pycache__/` — dépendances installées
+Usage académique — Mémoire de M2, 2025.

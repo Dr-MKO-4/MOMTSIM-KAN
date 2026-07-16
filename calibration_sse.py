@@ -77,7 +77,7 @@ class SSEFraudCalibrator:
                                        seed=self.seed + seed_offset)
 
         for step in range(self.n_steps):
-            n_tx_target = params.step_target_count[step]
+            n_tx_target = params.step_target_count[step % len(params.step_target_count)]
             n_tx_per_client = torch.distributions.Binomial(
                 total_count=n_tx_target.clamp(min=0),
                 probs=params.client_weight.clamp(0, 1)

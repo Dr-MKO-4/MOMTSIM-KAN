@@ -1,0 +1,51 @@
+{
+  "name": "momtsim",
+  "version": "1.0.0",
+  "description": "MoMTSim — Simulateur de transactions Mobile Money (CEMAC)",
+  "main": "main.js",
+  "author": "M2 Mémoire 2025",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.momtsim.desktop",
+    "productName": "MoMTSim",
+    "copyright": "M2 Mémoire 2025",
+    "directories": {
+      "output": "../dist-electron",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "loading.html"
+    ],
+    "extraResources": [
+      {
+        "from": "../dist/momtsim_server",
+        "to": "backend",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "MoMTSim",
+      "installerLanguages": ["fr_FR", "en_US"],
+      "language": "1036"
+    }
+  }
+}

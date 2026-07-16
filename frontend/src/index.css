@@ -2,86 +2,230 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Tokens CSS – thème sombre (défaut) ────────────────────────────────── */
+:root {
+  --bg-primary-rgb:   13  15  24;
+  --bg-secondary-rgb: 22  25  41;
+  --bg-card-rgb:      28  32  53;
+  --bg-hover-rgb:     32  36  64;
+
+  --text-primary-rgb: 226 232 240;
+  --text-muted-rgb:   148 163 184;
+  --text-dim-rgb:     78  90  114;
+
+  --border-rgb:       37  43  63;
+  --border-hover-rgb: 59  130 246;
+  --border-focus-rgb: 59  130 246;
+
+  --scrollbar-track:  #161929;
+  --scrollbar-thumb:  #252B3F;
+}
+
+/* ─── Tokens CSS – thème clair ──────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-primary-rgb:   248 250 252;
+  --bg-secondary-rgb: 255 255 255;
+  --bg-card-rgb:      255 255 255;
+  --bg-hover-rgb:     241 245 249;
+
+  --text-primary-rgb: 15  23  42;
+  --text-muted-rgb:   71  85  105;
+  --text-dim-rgb:     148 163 184;
+
+  --border-rgb:       226 232 240;
+  --border-hover-rgb: 59  130 246;
+  --border-focus-rgb: 59  130 246;
+
+  --scrollbar-track:  #F1F5F9;
+  --scrollbar-thumb:  #CBD5E1;
+}
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
 @layer base {
   html {
     font-family: "Fira Sans", Inter, system-ui, sans-serif;
-    background-color: #0F1117;
-    color: #E2E8F0;
+    background-color: rgb(var(--bg-primary-rgb));
+    color: rgb(var(--text-primary-rgb));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  body {
+    @apply bg-bg-primary text-text-primary;
   }
 
   code, pre, .mono {
     font-family: "Fira Code", "JetBrains Mono", monospace;
+    font-variant-ligatures: none;
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  :focus-visible {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+    border-radius: 4px;
   }
-  ::-webkit-scrollbar-track {
-    background: #1A1D27;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: #2D3348;
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: #3B82F6;
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
+/* ─── Components ─────────────────────────────────────────────────────────── */
 @layer components {
+
+  /* ── Cards ──────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-bg-card border border-border rounded-xl p-5;
+    @apply bg-bg-card border border-border rounded-card p-5 shadow-card;
   }
+  .card-hover {
+    @apply card hover:border-border-hover hover:shadow-card-hover
+           transition-all duration-200 cursor-pointer;
+  }
+  .card-sm {
+    @apply bg-bg-card border border-border rounded-card p-4 shadow-card;
+  }
+
+  /* ── Buttons ─────────────────────────────────────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg font-medium
+           transition-colors duration-150 cursor-pointer select-none
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-focus
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-sm { @apply btn text-xs px-3 py-1.5; }
+  .btn-md { @apply btn text-sm px-4 py-2; }
+  .btn-lg { @apply btn text-sm px-5 py-2.5; }
 
   .btn-primary {
-    @apply bg-accent-blue hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg
-           transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply btn-md bg-accent-blue hover:bg-blue-500 active:bg-blue-700 text-white;
   }
-
   .btn-secondary {
-    @apply bg-bg-secondary hover:bg-bg-card border border-border text-text-primary
-           font-medium px-4 py-2 rounded-lg transition-colors duration-150;
+    @apply btn-md bg-bg-secondary hover:bg-bg-hover border border-border
+           hover:border-border-hover text-text-primary;
   }
-
+  .btn-ghost {
+    @apply btn-md text-text-muted hover:text-text-primary hover:bg-bg-hover;
+  }
   .btn-danger {
-    @apply bg-accent-fraud hover:bg-red-600 text-white font-medium px-4 py-2 rounded-lg
-           transition-colors duration-150;
+    @apply btn-md bg-accent-fraud hover:bg-red-500 text-white;
+  }
+  .btn-outline {
+    @apply btn-md border border-border text-text-muted
+           hover:text-text-primary hover:border-border-hover hover:bg-bg-hover;
   }
 
+  /* ── Forms ───────────────────────────────────────────────────────────────── */
   .label {
-    @apply block text-xs font-medium text-text-muted mb-1 uppercase tracking-wide;
+    @apply block text-xs font-medium text-text-muted mb-1.5 leading-none;
   }
-
   .input {
-    @apply w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-sm
-           text-text-primary placeholder-text-dim focus:outline-none focus:border-border-focus
-           transition-colors duration-150;
+    @apply w-full bg-bg-secondary border border-border rounded-lg px-3 py-2
+           text-sm text-text-primary placeholder-text-dim
+           transition-colors duration-150
+           focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus/30;
   }
 
+  /* ── Badges ──────────────────────────────────────────────────────────────── */
   .badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-2xs font-mono font-medium;
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-2xs
+           font-mono font-medium leading-none;
+  }
+  .badge-blue   { @apply badge bg-blue-950/60  text-blue-300  border border-blue-800/40; }
+  .badge-green  { @apply badge bg-green-950/60 text-green-300 border border-green-800/40; }
+  .badge-red    { @apply badge bg-red-950/60   text-red-300   border border-red-800/40; }
+  .badge-amber  { @apply badge bg-amber-950/60 text-amber-300 border border-amber-800/40; }
+  .badge-purple { @apply badge bg-purple-950/60 text-purple-300 border border-purple-800/40; }
+  .badge-gray   { @apply badge bg-bg-secondary text-text-muted border border-border; }
+
+  /* ── Typography ──────────────────────────────────────────────────────────── */
+  .page-title     { @apply text-base font-semibold text-text-primary leading-tight; }
+  .section-title  { @apply text-sm font-semibold text-text-primary leading-snug; }
+  .section-subtitle { @apply text-xs text-text-muted leading-relaxed mb-4; }
+  .card-title     { @apply text-sm font-medium text-text-primary; }
+  .metric-value   { @apply text-2xl font-semibold font-mono text-text-primary leading-none; }
+  .metric-label   { @apply text-2xs text-text-muted uppercase tracking-widest; }
+  .caption        { @apply text-xs text-text-dim leading-relaxed; }
+  .code-inline    { @apply font-mono text-xs bg-bg-secondary border border-border rounded px-1.5 py-0.5; }
+
+  /* kept for backward compat */
+  .stat-value { @apply metric-value; }
+  .stat-label { @apply metric-label; }
+
+  /* ── Tables ──────────────────────────────────────────────────────────────── */
+  .table-th {
+    @apply text-left text-2xs uppercase tracking-widest text-text-dim
+           py-2 px-3 font-medium border-b border-border;
+  }
+  .table-td {
+    @apply py-2 px-3 border-b border-border/40 text-xs font-mono
+           text-text-muted transition-colors duration-100;
   }
 
-  .badge-blue  { @apply badge bg-blue-900/40 text-blue-300 border border-blue-800/50; }
-  .badge-green { @apply badge bg-green-900/40 text-green-300 border border-green-800/50; }
-  .badge-red   { @apply badge bg-red-900/40 text-red-300 border border-red-800/50; }
-  .badge-amber { @apply badge bg-amber-900/40 text-amber-300 border border-amber-800/50; }
-  .badge-gray  { @apply badge bg-slate-800/60 text-text-muted border border-border; }
-
-  .section-title {
-    @apply text-lg font-semibold text-text-primary mb-1;
-  }
-
-  .section-subtitle {
-    @apply text-sm text-text-muted mb-4;
-  }
-
-  .stat-value {
-    @apply text-2xl font-semibold font-mono text-text-primary;
-  }
-
-  .stat-label {
-    @apply text-xs text-text-muted uppercase tracking-wide mt-1;
-  }
+  /* ── Status dots ─────────────────────────────────────────────────────────── */
+  .status-dot         { @apply inline-block w-2 h-2 rounded-full flex-shrink-0; }
+  .status-dot-success { @apply status-dot bg-accent-green; }
+  .status-dot-warning { @apply status-dot bg-accent-amber; }
+  .status-dot-danger  { @apply status-dot bg-accent-fraud; }
+  .status-dot-info    { @apply status-dot bg-accent-blue; }
+  .status-dot-muted   { @apply status-dot bg-text-dim; }
 }
+
+/* ─── Overrides thème clair — couleurs structurelles ──────────────────────
+   Ces règles utilisent !important comme filet de sécurité : elles fonctionnent
+   même si Tailwind n'a pas encore été reconstruit avec la config CSS-variable,
+   garantissant que le thème clair est toujours appliqué visuellement.     */
+
+/* Fond global */
+[data-theme="light"] html,
+[data-theme="light"] body { background-color: #F8FAFC !important; color: #0F172A !important; }
+
+/* Fonds de surface */
+[data-theme="light"] .bg-bg-primary   { background-color: #F8FAFC !important; }
+[data-theme="light"] .bg-bg-secondary { background-color: #FFFFFF !important; }
+[data-theme="light"] .bg-bg-card      { background-color: #FFFFFF !important; }
+[data-theme="light"] .bg-bg-hover     { background-color: #F1F5F9 !important; }
+
+/* Texte */
+[data-theme="light"] .text-text-primary { color: #0F172A !important; }
+[data-theme="light"] .text-text-muted   { color: #475569 !important; }
+[data-theme="light"] .text-text-dim     { color: #94A3B8 !important; }
+
+/* Bordures */
+[data-theme="light"] .border-border { border-color: #E2E8F0 !important; }
+
+/* Cartes et panneaux */
+[data-theme="light"] .card    { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+[data-theme="light"] .card-sm { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+[data-theme="light"] .card-hover { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+
+/* Inputs */
+[data-theme="light"] .input { background-color: #F8FAFC !important; border-color: #E2E8F0 !important; color: #0F172A !important; }
+
+/* Sidebar & header */
+[data-theme="light"] aside,
+[data-theme="light"] header { background-color: #FFFFFF !important; border-color: #E2E8F0 !important; }
+
+/* Hover rows */
+[data-theme="light"] .hover\:bg-bg-hover:hover { background-color: #F1F5F9 !important; }
+
+/* ─── Overrides thème clair — badges ──────────────────────────────────────── */
+[data-theme="light"] .badge-blue   { @apply bg-blue-100   text-blue-700   border-blue-300; }
+[data-theme="light"] .badge-green  { @apply bg-green-100  text-green-700  border-green-300; }
+[data-theme="light"] .badge-red    { @apply bg-red-100    text-red-700    border-red-300; }
+[data-theme="light"] .badge-amber  { @apply bg-amber-100  text-amber-700  border-amber-300; }
+[data-theme="light"] .badge-purple { @apply bg-purple-100 text-purple-700 border-purple-300; }
+[data-theme="light"] .badge-gray   { @apply bg-slate-100  text-slate-600  border-slate-300; }
+
+[data-theme="light"] .card,
+[data-theme="light"] .card-sm { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06); }

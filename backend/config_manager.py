@@ -11,8 +11,10 @@ from pathlib import Path
 
 from .schemas import FraudConfig, SimulationParams
 
-FRAUD_CONFIG_PATH = Path(__file__).parent.parent / "fraudScenariosConfig.json"
-BACKUP_DIR = Path(__file__).parent.parent / "config_backups"
+_data = Path(os.environ.get("MOMTSIM_DATA_DIR", str(Path(__file__).parent.parent)))
+
+FRAUD_CONFIG_PATH = _data / "fraudScenariosConfig.json"
+BACKUP_DIR        = _data / "config_backups"
 
 
 def _ensure_backup_dir() -> None:
@@ -53,7 +55,7 @@ def validate_fraud_config(data: dict) -> list[str]:
 
 
 def load_calibrated_probas() -> dict | None:
-    p = Path(__file__).parent.parent / "calibrated_probas.json"
+    p = _data / "calibrated_probas.json"
     if not p.exists():
         return None
     with open(p, encoding="utf-8") as f:
@@ -61,7 +63,7 @@ def load_calibrated_probas() -> dict | None:
 
 
 def save_calibrated_probas(probas: dict) -> str:
-    p = Path(__file__).parent.parent / "calibrated_probas.json"
+    p = _data / "calibrated_probas.json"
     with open(p, "w", encoding="utf-8") as f:
         json.dump(probas, f, indent=2)
     return str(p)
