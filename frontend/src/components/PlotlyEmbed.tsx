@@ -11,7 +11,7 @@ const IFRAME_BASE = `<!doctype html><html><head>
   <meta charset="utf-8"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0D0F18; overflow: hidden; }
+    html, body { width: 100%; height: 100%; background: #FFFFFF; overflow: hidden; }
     .plotly-graph-div { width: 100% !important; height: 100% !important; }
   </style>
 </head><body>`;

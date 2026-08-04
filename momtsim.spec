@@ -1,4 +1,5 @@
 # -*- mode: python ; coding: utf-8 -*-
+import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 """
 PyInstaller spec — MoMTSim backend server.
 Produit un dossier dist/momtsim_server/ (--onedir) embarqué par Electron.
@@ -11,9 +12,9 @@ block_cipher = None
 
 # ── Fichiers de données à embarquer ──────────────────────────────────────────
 extra_datas = [
-    ("paramFiles",                 "paramFiles"),
-    ("fraudScenariosConfig.json",  "."),
-    ("frontend/dist",              "frontend/dist"),
+    ("config/paramFiles",              "paramFiles"),
+    ("config/fraudScenariosConfig.json", "."),
+    ("frontend/dist",                  "frontend/dist"),
 ]
 
 # ── Imports cachés — uvicorn + FastAPI + starlette staticfiles ────────────────
@@ -57,11 +58,12 @@ hidden = [
     "backend.schemas",
     "backend.config_manager",
     "backend.run_registry",
+    "backend.test_case_manager",
 ]
 
 a = Analysis(
     ["run_server.py"],
-    pathex=["."],
+    pathex=[".", "src"],
     binaries=[],
     datas=extra_datas,
     hiddenimports=hidden,
@@ -69,7 +71,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     # exclure les librairies inutiles pour réduire la taille
-    excludes=["tkinter", "PIL", "cv2", "sklearn", "matplotlib", "IPython", "jupyter"],
+    excludes=["tkinter", "PIL", "cv2", "sklearn", "matplotlib", "IPython", "jupyter", "transformers", "tokenizers", "datasets", "huggingface_hub"],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

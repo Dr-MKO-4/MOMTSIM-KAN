@@ -6,6 +6,7 @@ import FeaturesPage from "./pages/FeaturesPage";
 import KANPage from "./pages/KANPage";
 import CalibrationPage from "./pages/CalibrationPage";
 import HistoryPage from "./pages/HistoryPage";
+import DatasetPage from "./pages/DatasetPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/kan"         element={<KANPage />} />
       <Route path="/calibration" element={<CalibrationPage />} />
       <Route path="/history"     element={<HistoryPage />} />
+      <Route path="/data"        element={<DatasetPage />} />
     </Routes>
   );
 }

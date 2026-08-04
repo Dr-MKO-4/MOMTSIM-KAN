@@ -46,12 +46,13 @@ def register_run(job_id: str, run_type: str, result: dict) -> str:
     folder_path = _RUNS_DIR / folder_name
     folder_path.mkdir(parents=True, exist_ok=True)
 
-    # Copier les CSV produits si présents
-    csv_key = "csv_path"
-    if csv_key in result and result[csv_key]:
-        src = Path(result[csv_key])
-        if src.exists():
-            shutil.copy2(src, folder_path / src.name)
+    # Copier le parquet produit si présent
+    for _key in ("parquet_path", "csv_path"):
+        if _key in result and result[_key]:
+            src = Path(result[_key])
+            if src.exists():
+                shutil.copy2(src, folder_path / src.name)
+            break
 
     # Sauvegarder les métadonnées (sans les HTML Plotly — trop lourds)
     meta = {k: v for k, v in result.items() if k != "charts"}
@@ -75,6 +76,7 @@ def register_run(job_id: str, run_type: str, result: dict) -> str:
         "sse_final":      result.get("sse_final"),
         "converged":      result.get("converged"),
         "plain_summary":  result.get("plain_summary"),
+        "sim_params":     result.get("sim_params"),
     }
     summary = {k: v for k, v in summary.items() if v is not None}
 

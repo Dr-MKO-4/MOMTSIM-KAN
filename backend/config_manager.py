@@ -9,9 +9,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from .schemas import FraudConfig, SimulationParams
+from .schemas import FraudConfig
 
-_data = Path(os.environ.get("MOMTSIM_DATA_DIR", str(Path(__file__).parent.parent)))
+_data = Path(os.environ.get("MOMTSIM_DATA_DIR", str(Path(__file__).parent.parent / "config")))
 
 FRAUD_CONFIG_PATH = _data / "fraudScenariosConfig.json"
 BACKUP_DIR        = _data / "config_backups"
@@ -67,6 +67,58 @@ def save_calibrated_probas(probas: dict) -> str:
     with open(p, "w", encoding="utf-8") as f:
         json.dump(probas, f, indent=2)
     return str(p)
+
+
+SIM_CONFIG_PATH   = _data / "sim_config.json"
+CALIB_CONFIG_PATH = _data / "calib_config.json"
+
+_SIM_DEFAULTS: dict = {
+    "n_clients": 2000, "n_merchants": 300, "n_banks": 20,
+    "n_mules": 300, "max_slots": 50, "n_steps": 720, "seed": 1000,
+}
+
+_CALIB_DEFAULTS: dict = {
+    "n_clients": 500, "n_merchants": 100, "n_banks": 10,
+    "n_mules": 300, "max_slots": 50,
+    "target_mid": 0.23, "n_steps": 720, "n_bins": 30,
+    "n_seeds_per_eval": 3, "maxiter": 30, "lr": 0.05, "spsa_c": 0.02,
+}
+
+
+def load_sim_config() -> dict:
+    """Charge sim_config.json ; retourne les défauts si absent."""
+    if not SIM_CONFIG_PATH.exists():
+        return dict(_SIM_DEFAULTS)
+    with open(SIM_CONFIG_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_sim_config(params: dict) -> str:
+    """Persiste les paramètres de simulation (hors fraud_probas)."""
+    with open(SIM_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(params, f, indent=2)
+    return str(SIM_CONFIG_PATH)
+
+
+def load_calib_config() -> dict:
+    """Charge calib_config.json, puis surcharge n_mules et max_slots depuis sim_config."""
+    base = dict(_CALIB_DEFAULTS)
+    if CALIB_CONFIG_PATH.exists():
+        with open(CALIB_CONFIG_PATH, encoding="utf-8") as f:
+            base.update(json.load(f))
+    # Synchronisation automatique des paramètres partagés avec la simulation
+    sim = load_sim_config()
+    for key in ("n_mules", "max_slots"):
+        if key in sim:
+            base[key] = sim[key]
+    return base
+
+
+def save_calib_config(params: dict) -> str:
+    """Persiste les paramètres SPSA."""
+    with open(CALIB_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(params, f, indent=2)
+    return str(CALIB_CONFIG_PATH)
 
 
 def list_backups() -> list[dict]:

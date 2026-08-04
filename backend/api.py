@@ -17,7 +17,7 @@ Endpoints :
 
   GET  /api/probas                 → calibrated_probas.json courant
 
-  GET  /api/data/raw               → rawLog_torch.csv paginé
+  GET  /api/data/raw               → rawLog_torch.parquet paginé
   GET  /api/data/features          → featuresLog.csv paginé
   GET  /api/data/fraudsters        → fraudsters.csv complet
 
@@ -38,6 +38,7 @@ from .schemas import SimulationParams, CalibrationParams
 from . import config_manager as cm
 from . import pipeline_runner as pr
 from . import run_registry as rr
+from . import test_case_manager as tcm
 
 app = FastAPI(
     title="MoMTSim-KAN API",
@@ -90,6 +91,37 @@ def restore_backup(backup_name: str):
 
 
 # ---------------------------------------------------------------------------
+# Sim config (sim_config.json)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/sim-config", tags=["config"])
+def get_sim_config():
+    return cm.load_sim_config()
+
+
+@app.put("/api/sim-config", tags=["config"])
+def put_sim_config(params: SimulationParams):
+    data = {k: v for k, v in params.__dict__.items() if k != "fraud_probas"}
+    path = cm.save_sim_config(data)
+    return {"saved": path}
+
+
+# ---------------------------------------------------------------------------
+# Calib config (calib_config.json)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/calib-config", tags=["calibration"])
+def get_calib_config():
+    return cm.load_calib_config()
+
+
+@app.put("/api/calib-config", tags=["calibration"])
+def put_calib_config(params: CalibrationParams):
+    path = cm.save_calib_config(params.__dict__)
+    return {"saved": path}
+
+
+# ---------------------------------------------------------------------------
 # Probas calibrées
 # ---------------------------------------------------------------------------
 
@@ -116,6 +148,21 @@ def get_job(job_id: str):
     if job is None:
         raise HTTPException(404, f"Job {job_id!r} introuvable.")
     return job
+
+
+@app.post("/api/jobs/{job_id}/cancel", tags=["jobs"])
+def cancel_job_endpoint(job_id: str):
+    cancelled = pr.cancel_job(job_id)
+    if not cancelled:
+        raise HTTPException(404, "Job introuvable ou déjà terminé.")
+    return {"cancelled": True, "job_id": job_id}
+
+
+@app.post("/api/jobs/cancel-all", tags=["jobs"])
+def cancel_all_jobs():
+    """Annule tous les jobs en cours (pending + running)."""
+    cancelled = pr.cancel_all_jobs()
+    return {"cancelled": cancelled}
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +229,30 @@ def get_fraudsters():
 
 
 # ---------------------------------------------------------------------------
+# Cas de test
+# ---------------------------------------------------------------------------
+
+@app.get("/api/test-cases", tags=["test-cases"])
+def list_test_cases():
+    return tcm.load_test_cases()
+
+
+@app.post("/api/test-cases", tags=["test-cases"])
+def create_test_case(body: dict):
+    name = body.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="name requis.")
+    return tcm.save_test_case(name, body.get("params", {}), body.get("description", ""))
+
+
+@app.delete("/api/test-cases/{case_id}", tags=["test-cases"])
+def remove_test_case(case_id: str):
+    if not tcm.delete_test_case(case_id):
+        raise HTTPException(status_code=404, detail="Cas de test introuvable.")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
 # Historique des runs (BLOC C4)
 # ---------------------------------------------------------------------------
 
@@ -209,19 +280,31 @@ def delete_run(run_id: str):
     return {"deleted": run_id}
 
 
+@app.get("/api/runs/{run_id}/params", tags=["history"])
+def get_run_params(run_id: str):
+    """Retourne les SimulationParams sauvegardés pour un run de type simulation."""
+    run = rr.get_run(run_id)
+    if run is None:
+        raise HTTPException(404, f"Run {run_id!r} introuvable.")
+    params = run.get("summary", {}).get("sim_params") or run.get("metadata", {}).get("sim_params")
+    if params is None:
+        raise HTTPException(404, "Paramètres de simulation introuvables pour ce run (run trop ancien ou type non simulation).")
+    return params
+
+
 # ---------------------------------------------------------------------------
 # Santé
 # ---------------------------------------------------------------------------
 
 @app.get("/api/health", tags=["system"])
 def health():
-    _data = Path(os.environ.get("MOMTSIM_DATA_DIR", str(Path(__file__).parent.parent)))
+    _data = Path(os.environ.get("MOMTSIM_DATA_DIR", str(Path(__file__).parent.parent / "config")))
     return {
         "status": "ok",
         "files": {
             "fraudScenariosConfig": (_data / "fraudScenariosConfig.json").exists(),
-            "rawLog_torch":         (_data / "rawLog_torch.csv").exists(),
-            "featuresLog":          (_data / "featuresLog.csv").exists(),
+            "rawLog_torch":         (_data / "rawLog_torch.parquet").exists(),
+            "featuresLog":          (_data / "featuresLog.parquet").exists(),
             "calibrated_probas":    (_data / "calibrated_probas.json").exists(),
         },
     }

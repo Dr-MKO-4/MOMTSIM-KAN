@@ -124,8 +124,8 @@ export default function DashboardPage() {
           {health ? (
             <div>
               <FileStatusRow ok={health.files.fraudScenariosConfig} name="fraudScenariosConfig.json" />
-              <FileStatusRow ok={health.files.rawLog_torch}         name="rawLog_torch.csv" />
-              <FileStatusRow ok={health.files.featuresLog}          name="featuresLog.csv" />
+              <FileStatusRow ok={health.files.rawLog_torch}         name="rawLog_torch.parquet" />
+              <FileStatusRow ok={health.files.featuresLog}          name="featuresLog.parquet" />
               <FileStatusRow ok={health.files.calibrated_probas}    name="calibrated_probas.json" />
             </div>
           ) : (

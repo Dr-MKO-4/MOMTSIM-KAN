@@ -11,6 +11,7 @@ Usage :
 import argparse
 import json
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -19,8 +20,9 @@ import torch
 from momtsim_torch import TorchParameters, TorchMoMTSimEngine, TorchFraudInjector
 from features import FeatureEngineer
 
-PARAM_DIR = "./paramFiles"
-FRAUD_CONFIG_PATH = "./fraudScenariosConfig.json"
+_ROOT = Path(__file__).parent.parent
+PARAM_DIR = str(_ROOT / "config" / "paramFiles")
+FRAUD_CONFIG_PATH = str(_ROOT / "config" / "fraudScenariosConfig.json")
 SEED = 1000
 N_CLIENTS = 2000
 N_MERCHANTS = 300
@@ -75,9 +77,10 @@ def run_calibration() -> dict:
     print("\nProbas calibrées :", result["probas"])
     print("SSE final :", result["sse_final"])
 
-    with open("calibrated_probas.json", "w", encoding="utf-8") as f:
+    _out = str(_ROOT / "config" / "calibrated_probas.json")
+    with open(_out, "w", encoding="utf-8") as f:
         json.dump(result["probas"], f, indent=2)
-    print("Sauvegardé dans calibrated_probas.json")
+    print(f"Sauvegardé dans {_out}")
     return result["probas"]
 
 
@@ -107,15 +110,15 @@ def main():
         with open(args.probas, "r", encoding="utf-8") as f:
             fraud_probas = json.load(f)
         print(f"Probas chargées depuis {args.probas} : {fraud_probas}")
-    elif os.path.exists("calibrated_probas.json"):
-        with open("calibrated_probas.json", "r", encoding="utf-8") as f:
+    elif os.path.exists(str(_ROOT / "config" / "calibrated_probas.json")):
+        with open(str(_ROOT / "config" / "calibrated_probas.json"), "r", encoding="utf-8") as f:
             fraud_probas = json.load(f)
         print(f"Probas calibrées trouvées : {fraud_probas}")
 
     # --- Simulation ---
     print("\n=== Simulation complète ===")
     df_raw = run_simulation(fraud_probas=fraud_probas, verbose=True)
-    df_raw.to_csv("rawLog_torch.csv", index=False)
+    df_raw.to_parquet(str(_ROOT / "config" / "rawLog_torch.parquet"), index=False)
 
     fraud_rate = df_raw["isFraud"].mean()
     print(f"\nTerminé — {len(df_raw)} transactions")
@@ -127,8 +130,8 @@ def main():
     if not args.no_features:
         print("\n=== Feature engineering ===")
         df_features = run_feature_engineering(df_raw)
-        df_features.to_csv("featuresLog.csv", index=False)
-        print(f"featuresLog.csv sauvegardé — {len(df_features)} lignes, "
+        df_features.to_parquet(str(_ROOT / "config" / "featuresLog.parquet"), index=False)
+        print(f"featuresLog.parquet sauvegardé — {len(df_features)} lignes, "
               f"{len(df_features.columns)} colonnes")
 
 

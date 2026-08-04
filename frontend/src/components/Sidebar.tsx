@@ -8,6 +8,7 @@ import {
   Network,
   BarChart3,
   History,
+  Database,
   X,
 } from "lucide-react";
 
@@ -22,10 +23,11 @@ interface NavItem {
 const NAV: NavItem[] = [
   { label: "Tableau de bord", to: "/",           icon: LayoutDashboard,  end: true },
   { label: "Configuration",   to: "/config",      icon: SlidersHorizontal },
+  { label: "Calibration",     to: "/calibration", icon: BarChart3 },
   { label: "Simulation",      to: "/simulation",  icon: Play },
   { label: "Features",        to: "/features",    icon: Layers, badge: "12" },
+  { label: "Dataset",         to: "/data",        icon: Database },
   { label: "Validation KAN",  to: "/kan",         icon: Network },
-  { label: "Calibration",     to: "/calibration", icon: BarChart3 },
   { label: "Historique",      to: "/history",     icon: History },
 ];
 
@@ -40,7 +42,7 @@ function Sidebar({ open, onClose }: Props) {
       className={[
         "fixed lg:static inset-y-0 left-0 z-30",
         "w-56 flex-shrink-0 flex flex-col",
-        "bg-bg-secondary border-r border-border h-screen",
+        "bg-white border-r border-border h-screen",
         "transition-transform duration-200 ease-out",
         open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       ].join(" ")}
@@ -49,13 +51,13 @@ function Sidebar({ open, onClose }: Props) {
       {/* Logo */}
       <div className="px-5 py-4 border-b border-border flex items-start justify-between">
         <div>
-          <p className="text-accent-blue font-mono text-sm font-semibold tracking-widest uppercase leading-none">
+          <p className="text-accent-blue font-mono text-sm font-bold tracking-widest uppercase leading-none">
             MoMTSim
           </p>
-          <p className="text-text-dim text-2xs mt-1.5 font-mono">KAN · CEMAC · Fraude</p>
+          <p className="text-text-dim text-2xs mt-1.5 font-mono tracking-wide">KAN · CEMAC · Fraude</p>
         </div>
         <button
-          className="lg:hidden p-1.5 rounded-lg text-text-dim hover:text-text-primary hover:bg-bg-hover transition-colors duration-150"
+          className="lg:hidden p-1 text-text-dim hover:text-text-primary hover:bg-bg-hover transition-colors duration-150"
           onClick={onClose}
           aria-label="Fermer le menu"
         >
@@ -64,8 +66,8 @@ function Sidebar({ open, onClose }: Props) {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-3 px-2 overflow-y-auto" aria-label="Menu principal">
-        <p className="text-2xs text-text-dim uppercase tracking-widest px-3 mb-2 mt-1 font-medium select-none">
+      <nav className="flex-1 py-2 overflow-y-auto" aria-label="Menu principal">
+        <p className="text-2xs text-text-dim uppercase tracking-widest px-5 py-2 font-semibold select-none">
           Pipeline
         </p>
         {NAV.map((item) => (
@@ -76,11 +78,11 @@ function Sidebar({ open, onClose }: Props) {
             onClick={onClose}
             className={({ isActive }) =>
               [
-                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm mb-0.5",
-                "transition-colors duration-150 cursor-pointer border",
+                "flex items-center gap-3 px-5 py-2.5 text-sm transition-colors duration-100",
+                "border-l-2",
                 isActive
-                  ? "bg-accent-blue/10 text-accent-blue font-medium border-accent-blue/20"
-                  : "text-text-muted hover:text-text-primary hover:bg-bg-hover border-transparent",
+                  ? "border-l-accent-blue bg-blue-50 text-accent-blue font-medium"
+                  : "border-l-transparent text-text-muted hover:text-text-primary hover:bg-bg-hover",
               ].join(" ")
             }
           >
@@ -106,7 +108,7 @@ function Sidebar({ open, onClose }: Props) {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-border">
-        <p className="text-2xs text-text-dim font-mono">Mémoire M2 — 2025</p>
+        <p className="text-2xs text-text-dim font-mono">Mémoire M2 — 2026</p>
         <p className="text-2xs text-text-dim mt-0.5">Chapitres 3 &amp; 4</p>
       </div>
     </aside>

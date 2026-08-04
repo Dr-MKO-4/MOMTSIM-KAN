@@ -1,0 +1,14 @@
+{
+  "n_clients": 500,
+  "n_merchants": 12,
+  "n_banks": 8,
+  "n_mules": 300,
+  "max_slots": 3,
+  "target_mid": 0.23,
+  "n_steps": 720,
+  "n_bins": 30,
+  "n_seeds_per_eval": 3,
+  "maxiter": 30,
+  "lr": 0.05,
+  "spsa_c": 0.02
+}

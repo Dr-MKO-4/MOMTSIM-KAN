@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 # Ajouter le répertoire courant au path Python pour que `backend` soit importable
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import uvicorn
 

@@ -242,9 +242,9 @@ class TopologyValidator:
             title=f"Projection PCA — VE2={self.report.get('VE2', 0):.3f}, "
                   f"J_Fisher={self.report.get('J_Fisher', 0):.3f}",
             xaxis_title="Composante principale 1", yaxis_title="Composante principale 2",
-            template="plotly_dark", height=550,
-            paper_bgcolor="#0F1117", plot_bgcolor="#0F1117",
-            font=dict(color="#E2E8F0"))
+            template="simple_white", height=550,
+            paper_bgcolor="#FFFFFF", plot_bgcolor="#F8FAFC",
+            font=dict(color="#0F172A"))
         return fig
 
     def plot_ks_summary(self) -> go.Figure:
@@ -261,9 +261,9 @@ class TopologyValidator:
         fig.update_layout(
             title="Statistique KS par feature (régularité des distributions)",
             xaxis_title="Feature", yaxis_title="D_KS",
-            template="plotly_dark", height=450,
-            paper_bgcolor="#0F1117", plot_bgcolor="#0F1117",
-            font=dict(color="#E2E8F0"))
+            template="simple_white", height=450,
+            paper_bgcolor="#FFFFFF", plot_bgcolor="#F8FAFC",
+            font=dict(color="#0F172A"))
         return fig
 
 
@@ -274,9 +274,10 @@ class MoMTSimVisualizer:
         self.df_target = df_target_agg
         self.tracking = injector_tracking or {}
 
-    def _dark_layout(self, **kwargs) -> dict:
-        base = dict(template="plotly_dark", paper_bgcolor="#0F1117",
-                    plot_bgcolor="#0F1117", font=dict(color="#E2E8F0"))
+    def _light_layout(self, **kwargs) -> dict:
+        base = dict(template="simple_white", paper_bgcolor="#FFFFFF",
+                    plot_bgcolor="#F8FAFC", font=dict(color="#0F172A"),
+                    margin=dict(t=50, b=40, l=50, r=20))
         base.update(kwargs)
         return base
 
@@ -291,7 +292,7 @@ class MoMTSimVisualizer:
                 line=dict(width=1.5, color=palette[i % len(palette)])))
         fig.update_layout(title="Volume de transactions par step et par action",
                           xaxis_title="Step (heure)", yaxis_title="Nombre de transactions",
-                          height=450, **self._dark_layout())
+                          height=450, **self._light_layout())
         return fig
 
     def plot_nrmse_comparison(self, action: str) -> go.Figure:
@@ -316,7 +317,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title=f"Validation SSE — {action} (NRMSE = {nrmse:.4f})",
             xaxis_title="Step (heure)", yaxis_title="Nombre de transactions",
-            height=450, **self._dark_layout())
+            height=450, **self._light_layout())
         return fig
 
     def plot_fraud_scenario_distribution(self) -> go.Figure:
@@ -329,7 +330,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Répartition des transactions frauduleuses par scénario",
             xaxis_title="Scénario", yaxis_title="Nombre de transactions",
-            height=400, **self._dark_layout())
+            height=400, **self._light_layout())
         return fig
 
     def plot_fraud_timeline(self) -> go.Figure:
@@ -346,7 +347,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Timeline des scénarios de fraude (720 steps = 30 jours)",
             xaxis_title="Step (heure)", yaxis_title="Nombre de tx frauduleuses",
-            height=450, **self._dark_layout())
+            height=450, **self._light_layout())
         return fig
 
     def plot_r1_r2_scatter(self) -> go.Figure:
@@ -359,7 +360,7 @@ class MoMTSimVisualizer:
                 marker=dict(size=4, color=color, opacity=0.5)))
         fig.update_layout(
             title="r1 (montant/solde initial) vs r2 (montant/solde final)",
-            xaxis_title="r1", yaxis_title="r2", height=500, **self._dark_layout())
+            xaxis_title="r1", yaxis_title="r2", height=500, **self._light_layout())
         return fig
 
     def plot_feature_distributions(self, features: list = None) -> go.Figure:
@@ -379,8 +380,8 @@ class MoMTSimVisualizer:
                                        showlegend=(i == 0)), row=row, col=col)
         fig.update_layout(
             title="Distributions des features clés — légitime vs fraude",
-            template="plotly_dark", height=300 * ((n + 1) // 2), barmode="overlay",
-            paper_bgcolor="#0F1117", plot_bgcolor="#0F1117", font=dict(color="#E2E8F0"))
+            template="simple_white", height=300 * ((n + 1) // 2), barmode="overlay",
+            paper_bgcolor="#FFFFFF", plot_bgcolor="#F8FAFC", font=dict(color="#0F172A"))
         return fig
 
     def plot_smurfing_network_delta(self) -> go.Figure:
@@ -436,7 +437,7 @@ class MoMTSimVisualizer:
             xaxis_title="δ = (montant_reçu − montant_envoyé) / montant_reçu",
             yaxis_title="Fréquence",
             barmode="overlay",
-            height=420, **self._dark_layout())
+            height=420, **self._light_layout())
         return fig
 
     # ── A1 : NRMSE heatmap ──────────────────────────────────────────────────
@@ -481,7 +482,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="NRMSE par action × estimateur — validation SSE (section 3.1.3)",
             xaxis_title="Action", yaxis_title="Estimateur",
-            height=320, **self._dark_layout())
+            height=320, **self._light_layout())
         return fig
 
     # ── A2 : Conformité par scénario ────────────────────────────────────────
@@ -513,7 +514,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Fenêtre d'exfiltration ATO — montants TRANSFER par step (§3.2.1)",
             xaxis_title="Step (heure)", yaxis_title="Montant exfiltré (FCFA)",
-            height=380, **self._dark_layout())
+            height=380, **self._light_layout())
         return fig
 
     def plot_refund_delay_distribution(self) -> go.Figure:
@@ -537,7 +538,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Distribution des délais PAYMENT → REFUND — Δt ~ U(delay_min, delay_max) (§3.2.2)",
             xaxis_title="Délai (heures)", yaxis_title="Fréquence",
-            height=380, **self._dark_layout())
+            height=380, **self._light_layout())
         return fig
 
     def plot_fake_credentials_dormance(self) -> go.Figure:
@@ -557,7 +558,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Périodes de dormance — Fake Credentials (§3.2.3, dormance ∈ [min, max] jours)",
             xaxis_title="Dormance (heures)", yaxis_title="Fréquence",
-            height=380, **self._dark_layout())
+            height=380, **self._light_layout())
         return fig
 
     def plot_split_deposit_variance(self) -> go.Figure:
@@ -590,7 +591,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Variance intra-opération des fragments — Split Deposit (§3.2.4, éq. 3.14)",
             xaxis_title="Variance des montants par opération", yaxis_title="Fréquence",
-            height=380, **self._dark_layout())
+            height=380, **self._light_layout())
         return fig
 
     def plot_smurfing_periodicity(self) -> go.Figure:
@@ -628,7 +629,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Périodicité des opérations Smurfing — intervalles inter-op (§3.2.5)",
             xaxis_title="Intervalle (heures/steps)", yaxis_title="Fréquence",
-            height=380, **self._dark_layout())
+            height=380, **self._light_layout())
         return fig
 
     # ── A3 : Smurfing Sankey ────────────────────────────────────────────────
@@ -711,7 +712,7 @@ class MoMTSimVisualizer:
         )])
         fig.update_layout(
             title="Réseau Smurfing — flux émetteur→mule→récepteur (§3.2.5, Zhdanova et al.)",
-            height=500, **self._dark_layout())
+            height=500, **self._light_layout())
         return fig
 
     # ── B3 : Fraudster summary ──────────────────────────────────────────────
@@ -757,7 +758,7 @@ class MoMTSimVisualizer:
         fig.update_layout(
             title="Synthèse par scénario — activité frauduleuse (section 3.2 du mémoire)",
             height=400, barmode="group",
-            **self._dark_layout())
+            **self._light_layout())
         return fig
 
     # ── A4 : Résumés en langage naturel ────────────────────────────────────
@@ -778,12 +779,12 @@ class MoMTSimVisualizer:
         ]
         if by_sc:
             lines.append(f"Le scénario dominant est {top_sc} ({top_pct:.1f} % des fraudes).")
-        if rate > 0.25:
-            lines.append("⚠ Taux supérieur à 25 % — la calibration SPSA est recommandée.")
-        elif rate < 0.10:
-            lines.append("⚠ Taux inférieur à 10 % — augmenter les probabilités ou relancer la calibration.")
+        if rate > 0.26:
+            lines.append("⚠ Taux supérieur à 26 % — risque de sur-calibration sur les patterns frauduleux (§3.1.1).")
+        elif rate < 0.20:
+            lines.append("⚠ Taux inférieur à 20 % — relancer la calibration SPSA (cible [20 %, 26 %], §3.1.1).")
         else:
-            lines.append("Taux dans la plage cible [10 %, 25 %].")
+            lines.append("Taux dans la plage cible [20 %, 26 %] — cohérent avec Azamuke (2024, 2025) et §3.1.1.")
         return " ".join(lines)
 
     @staticmethod

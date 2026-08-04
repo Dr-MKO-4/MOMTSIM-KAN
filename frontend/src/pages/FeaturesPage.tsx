@@ -27,9 +27,11 @@ export default function FeaturesPage() {
   const [jobId, setJobId]     = useState<string | null>(null);
   const [result, setResult]   = useState<FeatureResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const launch = useCallback(async () => {
     setLoading(true);
+    setHasError(false);
     setResult(null);
     try {
       const { job_id } = await startFeatures();
@@ -43,7 +45,9 @@ export default function FeaturesPage() {
     setResult(r as unknown as FeatureResult);
   }, []);
 
-  const canLaunch = !loading && !(jobId !== null && result === null);
+  const onError = useCallback(() => setHasError(true), []);
+
+  const canLaunch = !loading && (jobId === null || result !== null || hasError);
 
   return (
     <Layout
@@ -92,10 +96,10 @@ export default function FeaturesPage() {
           </button>
 
           <p className="caption text-center">
-            Requiert rawLog_torch.csv (simulation préalable)
+            Requiert rawLog_torch.parquet (simulation préalable)
           </p>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={() => {}} />
+          <JobTracker jobId={jobId} onDone={onDone} onError={onError} />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}
@@ -118,7 +122,7 @@ export default function FeaturesPage() {
                 <StatCard
                   label="Fichier produit"
                   value="featuresLog"
-                  unit=".csv"
+                  unit=".parquet"
                   icon={FileText}
                 />
               </div>

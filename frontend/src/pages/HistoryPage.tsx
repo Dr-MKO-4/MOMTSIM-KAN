@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   History, Trash2, RefreshCw, Play, Layers, Network, BarChart3,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, RotateCcw,
 } from "lucide-react";
 import Layout from "../components/Layout";
 import EmptyState from "../components/ui/EmptyState";
-import { listRuns, deleteRun } from "../api/client";
+import { listRuns, deleteRun, getRunParams } from "../api/client";
 import type { RunEntry } from "../types/api";
 
 const TYPE_META: Record<string, { label: string; icon: typeof Play; color: string }> = {
@@ -23,8 +24,13 @@ const TYPE_FILTERS = [
   { value: "calibration", label: "Calibration" },
 ];
 
-function RunCard({ run, onDelete }: { run: RunEntry; onDelete: (id: string) => void }) {
+function RunCard({ run, onDelete, onResume }: {
+  run: RunEntry;
+  onDelete: (id: string) => void;
+  onResume: (id: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [resuming, setResuming] = useState(false);
   const meta = TYPE_META[run.run_type] ?? { label: run.run_type, icon: History, color: "text-text-muted" };
   const Icon = meta.icon;
   const s = run.summary;
@@ -70,8 +76,20 @@ function RunCard({ run, onDelete }: { run: RunEntry; onDelete: (id: string) => v
               {s.decision}
             </span>
           )}
+          {run.run_type === "simulation" && (
+            <button
+              className="p-1.5 text-text-dim hover:text-accent-blue hover:bg-accent-blue/10
+                         transition-colors duration-150 disabled:opacity-50"
+              onClick={(e) => { e.stopPropagation(); setResuming(true); onResume(run.id); }}
+              disabled={resuming}
+              aria-label="Recharger ces paramètres dans la simulation"
+              title="Reprendre / recharger les paramètres"
+            >
+              <RotateCcw className={`w-3.5 h-3.5 ${resuming ? "animate-spin" : ""}`} aria-hidden="true" />
+            </button>
+          )}
           <button
-            className="p-1.5 rounded-lg text-text-dim hover:text-accent-fraud hover:bg-accent-fraud/10
+            className="p-1.5 text-text-dim hover:text-accent-fraud hover:bg-accent-fraud/10
                        transition-colors duration-150"
             onClick={(e) => { e.stopPropagation(); onDelete(run.id); }}
             aria-label="Supprimer ce run"
@@ -154,6 +172,7 @@ function RunCard({ run, onDelete }: { run: RunEntry; onDelete: (id: string) => v
 }
 
 export default function HistoryPage() {
+  const navigate = useNavigate();
   const [runs, setRuns]           = useState<RunEntry[]>([]);
   const [loading, setLoading]     = useState(false);
   const [filterType, setFilterType] = useState("");
@@ -180,6 +199,16 @@ export default function HistoryPage() {
       // silently ignore
     }
   }, []);
+
+  const handleResume = useCallback(async (id: string) => {
+    try {
+      const params = await getRunParams(id);
+      navigate("/simulation", { state: { params } });
+    } catch {
+      // si params non dispo (run ancien), on navigue quand même vers la simulation
+      navigate("/simulation");
+    }
+  }, [navigate]);
 
   return (
     <Layout
@@ -227,7 +256,7 @@ export default function HistoryPage() {
         ) : (
           <div className="space-y-2">
             {runs.map((run) => (
-              <RunCard key={run.id} run={run} onDelete={handleDelete} />
+              <RunCard key={run.id} run={run} onDelete={handleDelete} onResume={handleResume} />
             ))}
           </div>
         )}

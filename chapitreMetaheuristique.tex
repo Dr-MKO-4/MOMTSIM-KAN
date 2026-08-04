@@ -1,0 +1,555 @@
+\documentclass[12pt,a4paper]{book}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{microtype}
+
+\geometry{margin=2.5cm}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+% Rename algorithm float
+\floatname{algorithm}{Algorithme}
+\renewcommand{\algorithmicrequire}{\textbf{Entrée :}}
+\renewcommand{\algorithmicensure}{\textbf{Sortie :}}
+
+\begin{document}
+
+\chapter{Méta-heuristiques et intelligence artificielle}
+\textit{Auteurs : Jin-Kao Hao et Christine Solnon}
+
+\section{Introduction}
+\label{sec:intro}
+
+Une méta-heuristique est une méthode générique pour la résolution de problèmes combinatoires NP-difficiles. La résolution de ces problèmes nécessite l'examen d'un très grand nombre (exponentiel) de combinaisons. Tout un chacun a déjà été confronté à ce phénomène d'explosion combinatoire qui transforme un problème apparemment très simple en un véritable casse-tête dès lors que l'on augmente la taille du problème à résoudre. C'est le cas par exemple quand on cherche à concevoir un emploi du temps. S'il y a peu de cours à planifier, le nombre de combinaisons à explorer est faible et le problème est très rapidement résolu. Cependant, l'ajout de quelques cours seulement peut augmenter considérablement le nombre de combinaisons à explorer de sorte que le temps de résolution devient excessivement long.
+
+L'enjeu pour résoudre ces problèmes est de taille : un très grand nombre de problèmes industriels sont confrontés à ce phénomène d'explosion combinatoire comme, par exemple, les problèmes consistant à planifier une production en minimisant les pertes de temps, ou à découper des formes dans des matériaux en minimisant les chutes. Il est donc crucial de concevoir des approches ``intelligentes'', capables de contenir ou de contourner l'explosion combinatoire afin de résoudre ces problèmes difficiles en un temps acceptable.
+
+Les problèmes d'optimisation combinatoires peuvent être résolus par deux principales familles d'approches. Les approches ``exactes'' explorent de façon systématique l'espace des combinaisons jusqu'à trouver une solution optimale. Afin de (tenter de) contenir l'explosion combinatoire, ces approches structurent l'espace des combinaisons en arbre et utilisent des techniques d'élagage, pour réduire cet espace, et des heuristiques, pour déterminer l'ordre dans lequel il est exploré. Ces approches exactes permettent de résoudre en pratique de nombreux problèmes d'optimisation combinatoires. Cependant, les techniques de filtrage et les heuristiques d'ordre ne réduisent pas toujours suffisamment la combinatoire, et certaines instances de problèmes ne peuvent être résolues en un temps acceptable par ces approches exhaustives.
+
+Une alternative consiste à utiliser des méta-heuristiques qui contournent le problème de l'explosion combinatoire en n'explorant délibérément qu'une partie de l'espace des combinaisons. Par conséquent, elles peuvent ne pas trouver la solution optimale, et encore moins prouver l'optimalité de la solution trouvée ; en contrepartie, la complexité en temps est généralement faiblement polynomiale.
+
+\paragraph{Organisation du chapitre.}
+Il existe essentiellement deux grandes familles d'approches heuristiques : les approches perturbatives, présentées en~\ref{sec:perturbatives}, construisent des combinaisons en modifiant des combinaisons existantes ; les approches constructives, présentées en~\ref{sec:constructives}, génèrent des combinaisons de façon incrémentale en utilisant pour cela un modèle stochastique. Ces différentes approches peuvent être hybridées, et nous présentons en~\ref{sec:hybrides} quelques uns des schémas d'hybridation les plus connus. Nous introduisons ensuite en~\ref{sec:intensification} les notions d'intensification (exploitation) et de diversification (exploration), communes à toutes ces approches heuristiques : l'intensification vise à diriger l'effort de recherche aux alentours des meilleures combinaisons trouvées, tandis que la diversification vise à garantir un bon échantillonnage de l'espace de recherche. Enfin, nous développerons en~\ref{sec:applications} deux applications de ces méta-heuristiques à la résolution de problèmes classiques de l'intelligence artificielle, à savoir la satisfiabilité de formules booléennes et la satisfaction de contraintes.
+
+\paragraph{Notations.}
+Dans la suite de ce chapitre, nous supposerons que le problème à résoudre est défini par un couple $(E, f)$ tel que $E$ est un ensemble de combinaisons candidates, et $f : E \to \mathbb{R}$ est une fonction objectif associant à chaque combinaison de $E$ une valeur numérique. Résoudre un tel problème consiste à chercher la combinaison $e^* \in E$ qui optimise (maximise ou minimise, selon les cas) $f$.
+
+Nous illustrerons plus particulièrement les différentes méta-heuristiques introduites dans ce chapitre sur le problème du voyageur de commerce, qui constituera notre ``fil rouge'' : étant donnés un ensemble $V$ de villes et une fonction $d : V \times V \to \mathbb{R}$ donnant pour chaque paire de villes différentes $\{i, j\} \subseteq V$ la distance $d(i, j)$ séparant les villes $i$ et $j$, il s'agit de trouver le plus court circuit passant par chaque ville de $V$ une et une seule fois. Pour ce problème, l'ensemble $E$ des combinaisons candidates est défini par l'ensemble des permutations circulaires de $V$ et la fonction objectif $f$ à minimiser est définie par la somme des distances entre deux villes consécutives dans la permutation.
+
+\section{Méta-heuristiques perturbatives}
+\label{sec:perturbatives}
+
+Les approches perturbatives explorent l'espace des combinaisons $E$ en perturbant itérativement des combinaisons déjà construites : partant d'une ou plusieurs combinaisons initiales (généralement prises aléatoirement dans $E$), l'idée est de générer à chaque étape une ou plusieurs nouvelles combinaisons en modifiant une ou plusieurs combinaisons générées précédemment. Ces approches sont dites ``basées sur les instances'' dans~\cite{zlochin2004}. Les approches perturbatives les plus connues sont les algorithmes génétiques, décrits en~\ref{sec:genetiques}, et la recherche locale, décrite en~\ref{sec:locale}.
+
+\subsection{Algorithmes génétiques}
+\label{sec:genetiques}
+
+Les algorithmes génétiques~\cite{holland1975,goldberg1989,eiben2003} s'inspirent de la théorie de l'évolution et des règles de la génétique qui expliquent la capacité des espèces vivantes à s'adapter à leur environnement par la combinaison des mécanismes suivants :
+\begin{itemize}
+  \item la \textit{sélection naturelle} fait que les individus les mieux adaptés à l'environnement tendent à survivre plus longtemps et ont donc une plus grande probabilité de se reproduire ;
+  \item la \textit{reproduction par croisement} fait qu'un individu hérite ses caractéristiques de ses parents, de sorte que le croisement de deux individus bien adaptés à leur environnement aura tendance à créer un nouvel individu bien adapté à l'environnement ;
+  \item la \textit{mutation} fait que certaines caractéristiques peuvent apparaître ou disparaître de façon aléatoire, permettant ainsi d'introduire de nouvelles capacités d'adaptation à l'environnement, capacités qui pourront se propager grâce aux mécanismes de sélection et de croisement.
+\end{itemize}
+
+Les algorithmes génétiques reprennent ces mécanismes pour définir une méta-heuristique. L'idée est de faire évoluer une population de combinaisons, par sélection, croisement et mutation, la capacité d'adaptation d'une combinaison étant ici évaluée par la fonction objectif à optimiser. L'algorithme~\ref{alg:genetique} décrit ce principe général, dont les principales étapes sont détaillées ci-après.
+
+\begin{algorithm}[ht]
+\caption{Algorithme génétique}
+\label{alg:genetique}
+\begin{algorithmic}[1]
+\State Initialiser la population avec un ensemble de combinaisons de $E$
+\While{critères d'arrêt non atteints}
+  \State Sélectionner des combinaisons de la population
+  \State Créer de nouvelles combinaisons par recombinaison et mutation
+  \State Mettre à jour la population
+\EndWhile
+\State \Return la meilleure combinaison ayant appartenu à la population
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Initialisation de la population.}
+En général, la population initiale est générée de façon aléatoire, selon une distribution uniforme assurant une bonne diversité des combinaisons.
+
+\paragraph{Sélection.}
+Cette étape consiste à choisir les combinaisons de la population qui seront ensuite candidates pour la recombinaison et la mutation. Il s'agit là de favoriser la sélection des meilleures combinaisons, tout en laissant une petite chance aux moins bonnes combinaisons. Il existe de nombreuses façons de procéder à cette étape de sélection. Par exemple, la sélection par tournoi consiste à choisir aléatoirement deux combinaisons et à sélectionner la meilleure des deux (ou bien à sélectionner une des deux selon une probabilité dépendant de la fonction objectif). La sélection peut également être réalisée selon d'autres critères comme la diversité. Dans ce cas de figure, seuls les individus ``distancés'' sont autorisés à survivre et à se reproduire.
+
+\paragraph{Recombinaison (croisement).}
+Cette étape vise à créer de nouveaux individus par un mélange de combinaisons sélectionnées. L'objectif est de conduire la recherche dans une nouvelle zone de l'espace où de meilleures combinaisons peuvent être trouvées. À cette fin, la recombinaison doit être bien adaptée à la fonction à optimiser et capable de transmettre de bonnes propriétés des parents vers la combinaison créée. De plus, l'opérateur de recombinaison devrait idéalement permettre de créer des descendants diversifiés. Du point de vue de l'exploration et l'exploitation, la recombinaison est destinée à jouer un rôle de diversification stratégique avec un objectif à long terme de renforcement de l'intensification.
+
+\paragraph{Mutation.}
+Cette opération consiste à modifier de façon aléatoire certains composants des combinaisons obtenues par croisement.
+
+\begin{quote}
+\textbf{Exemple 1.} Pour le voyageur de commerce, un opérateur de recombinaison simple consiste à recopier une sous-séquence du premier parent, et à compléter la permutation en plaçant les villes manquantes dans l'ordre où elles apparaissent dans le deuxième parent. Un opérateur de mutation classique consiste à choisir aléatoirement quelques villes et les échanger.
+\end{quote}
+
+\paragraph{Mise à jour de la population.}
+Cette étape détermine quelles nouvelles combinaisons doivent devenir membre de la population et quelles anciennes combinaisons de la population doivent être remplacées. La politique de mise-à-jour est essentielle pour maintenir une diversité appropriée de la population, pour prévenir une convergence prématurée du processus de recherche, et pour permettre à l'algorithme de toujours découvrir de nouvelles zones prometteuses dans l'espace de recherche. Ainsi, les décisions sont souvent prises selon des critères liés à la fois à la qualité et à la diversité.
+
+\paragraph{Critères d'arrêt.}
+Le processus d'évolution est itéré, de génération en génération, jusqu'à ce qu'un critère d'arrêt soit atteint. Il peut s'agir d'un nombre maximum de générations, un nombre maximum d'évaluations, un nombre maximum de générations sans améliorer la meilleure solution, une qualité de solution atteinte ou encore une diversité de population inférieure à un seuil donné.
+
+\subsection{Recherche locale}
+\label{sec:locale}
+
+Une recherche locale explore l'espace des combinaisons de proche en proche, en partant d'une combinaison initiale et en sélectionnant à chaque itération une combinaison voisine de la combinaison courante, obtenue en lui appliquant une transformation élémentaire~\cite{hoos2005}. L'algorithme~\ref{alg:locale} décrit ce principe général.
+
+\begin{algorithm}[ht]
+\caption{Recherche locale}
+\label{alg:locale}
+\begin{algorithmic}[1]
+\State Générer une combinaison initiale $e \in E$
+\While{critères d'arrêt non atteints}
+  \State Choisir $e' \in v(e)$
+  \State $e \leftarrow e'$
+\EndWhile
+\State \Return la meilleure combinaison construite
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Fonction de voisinage.}
+L'algorithme de recherche locale est paramétré par une fonction de voisinage $v : E \to \mathcal{P}(E)$ définissant l'ensemble des combinaisons que l'on peut explorer à partir d'une combinaison donnée. Étant donnée une combinaison courante $e \in E$, $v(e)$ est un ensemble de combinaisons que l'on peut obtenir en appliquant une modification ``élémentaire'' à $e$.
+
+\begin{quote}
+\textbf{Exemple 2.} Pour le problème du voyageur de commerce, l'opérateur 2-opt consiste à supprimer deux arêtes et les remplacer par les deux nouvelles arêtes qui reconnectent les deux chemins créés par la suppression des arêtes. Plus généralement, l'opérateur $k$-opt consiste à supprimer $k$ arêtes mutuellement disjointes et à réassembler les différents morceaux de chemin ainsi créés en ajoutant $k$ nouvelles arêtes de façon à reconstituer un tour complet. Plus $k$ est grand, plus la taille du voisinage est importante.
+\end{quote}
+
+\paragraph{Génération de la combinaison initiale.}
+La combinaison à partir de laquelle le processus d'exploration commence est souvent générée de façon aléatoire. Elle est parfois générée en suivant une heuristique constructive gloutonne (voir la section~\ref{sec:gloutons}).
+
+\paragraph{Choix du voisin.}
+À chaque itération de la recherche locale, il s'agit de choisir une combinaison dans le voisinage de la combinaison courante. Ce choix d'une combinaison voisine est appelé ``mouvement''. Il existe un très grand nombre de stratégies de choix. Des stratégies ``gloutonnes'' (aussi appelées ``montées de gradients'') risquent fort d'être rapidement piégées dans des optima locaux. Pour s'échapper de ces optima locaux, on peut considérer différentes méta-heuristiques :
+\begin{itemize}
+  \item la \textit{marche aléatoire} (\textit{random walk})~\cite{selman1994noise}, qui autorise avec une très petite probabilité de sélectionner un voisin de façon complètement aléatoire ;
+  \item le \textit{recuit simulé} (\textit{simulated annealing})~\cite{aarts1989}, qui autorise de sélectionner des voisins de moins bonne qualité selon une probabilité qui décroit avec le temps ;
+  \item la \textit{recherche taboue} (\textit{tabu search})~\cite{glover1993}, qui empêche de boucler sur un petit nombre de combinaisons autour des optima locaux en mémorisant les derniers mouvements effectués dans une liste taboue et en interdisant les mouvements inverses à ces derniers mouvements ;
+  \item la \textit{recherche à voisinage variable}~\cite{mladenovic1997}, qui change d'opérateur de voisinage lorsque la combinaison courante est un optimum local par rapport au voisinage courant.
+\end{itemize}
+
+\paragraph{Répétition du processus de recherche locale.}
+Une recherche locale peut être répétée plusieurs fois à partir de combinaisons initiales différentes. On parle alors de recherche locale à plusieurs points de départ (\textit{multi-start local search}). Il peut également s'agir de combinaisons initiales obtenues en perturbant une combinaison issue d'un processus de recherche locale précédent : on parle alors de recherche locale itérée (\textit{iterated local search})~\cite{lourenco2002}.
+
+\section{Méta-heuristiques constructives}
+\label{sec:constructives}
+
+Les approches constructives construisent une ou plusieurs combinaisons de façon incrémentale, c'est-à-dire, en partant d'une combinaison vide, et en ajoutant des composants de combinaison jusqu'à obtenir une combinaison complète. Ces approches sont dites ``basées sur les modèles'' dans~\cite{zlochin2004}.
+
+Il existe différentes stratégies pour choisir les composants à ajouter à chaque itération, les plus connues étant les stratégies gloutonnes aléatoires, décrites en~\ref{sec:gloutons}, les algorithmes par estimation de distribution, décrits en~\ref{sec:eda} et la méta-heuristique d'optimisation par colonies de fourmis, introduite en~\ref{sec:aco}.
+
+\subsection{Algorithmes gloutons aléatoires}
+\label{sec:gloutons}
+
+Les algorithmes gloutons (\textit{greedy}) construisent une combinaison en partant d'une combinaison vide et en choisissant à chaque itération un composant de combinaison pour lequel une heuristique donnée est maximale.
+
+\begin{quote}
+\textbf{Exemple 3.} Un algorithme glouton pour le problème du voyageur de commerce peut être défini de la façon suivante : partant d'une ville initiale choisie aléatoirement, on se déplace à chaque itération sur la ville non visitée la plus proche de la dernière ville visitée, jusqu'à ce que toutes les villes aient été visitées.
+\end{quote}
+
+Les algorithmes gloutons aléatoires (\textit{greedy randomized}) construisent plusieurs combinaisons et adoptent également une stratégie gloutonne pour le choix des composants, mais ils introduisent un peu d'aléatoire afin de diversifier les combinaisons construites.
+
+\begin{quote}
+\textbf{Exemple 4.} Pour le problème du voyageur de commerce, si la dernière ville visitée est $i$, et si $C$ contient l'ensemble des villes qui n'ont pas encore été visitées, on peut définir la probabilité de visiter la ville $j \in C$ par
+\[
+p(j) = \frac{[1/d(i,j)]^\beta}{\sum_{k \in C} [1/d(i,k)]^\beta}.
+\]
+$\beta$ est un paramètre permettant de régler le niveau d'aléatoire : si $\beta = 0$, alors toutes les villes non visitées ont la même probabilité d'être choisies ; plus on augmente $\beta$ et plus on augmente la probabilité de choisir les villes les plus proches.
+\end{quote}
+
+\subsection{Algorithmes par estimation de distributions}
+\label{sec:eda}
+
+Les algorithmes par estimation de distribution (\textit{Estimation of Distribution Algorithms} ; EDA)~\cite{larranaga2001} sont des algorithmes gloutons aléatoires itératifs. L'algorithme~\ref{alg:eda} décrit ce principe général.
+
+\begin{algorithm}[ht]
+\caption{Algorithmes par estimation de distributions}
+\label{alg:eda}
+\begin{algorithmic}[1]
+\State Générer une population de combinaisons $P \subseteq E$
+\While{critères d'arrêt non atteints}
+  \State Construire un modèle probabiliste $M$ en fonction de $P$
+  \State Générer de nouvelles combinaisons à l'aide de $M$
+  \State Mettre à jour $P$ en fonction des nouvelles combinaisons
+\EndWhile
+\State \Return la meilleure combinaison ayant appartenu à la population
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Génération du modèle probabiliste $M$.}
+Différents types de modèles probabilistes, plus ou moins simples, peuvent être considérés. Le modèle le plus simple, appelé PBIL~\cite{baluja1994}, est basé sur la probabilité d'apparition de chaque composant sans tenir compte d'éventuelles relations de dépendances entre les composants. D'autres modèles plus fins, mais aussi plus coûteux, utilisent des réseaux bayésiens~\cite{pelikan1999}.
+
+\begin{quote}
+\textbf{Exemple 5.} Pour le problème du voyageur de commerce, si la dernière ville visitée est $i$, et si $C$ contient l'ensemble des villes non visitées, on peut définir la probabilité de visiter la ville $j \in C$ par
+\[
+p(j) = \frac{freq_P(i,j)}{\sum_{k \in C} freq_P(i,k)},
+\]
+où $freq_P(i, j)$ donne le nombre de combinaisons de la population $P$ contenant l'arête $(i, j)$.
+\end{quote}
+
+\subsection{Optimisation par colonies de fourmis}
+\label{sec:aco}
+
+Il existe un parallèle assez fort entre l'optimisation par colonies de fourmis (\textit{Ant Colony Optimization} ; ACO) et les algorithmes par estimation de distribution~\cite{zlochin2004}. L'originalité et la contribution essentielle d'ACO est de s'inspirer du comportement collectif des fourmis pour faire évoluer le modèle probabiliste. Ainsi, la probabilité de choisir un composant est définie proportionnellement à une quantité de phéromone représentant l'expérience passée de la colonie. L'algorithme~\ref{alg:aco} décrit ce principe général.
+
+\begin{algorithm}[ht]
+\caption{Optimisation par colonies de fourmis}
+\label{alg:aco}
+\begin{algorithmic}[1]
+\State Initialiser les traces de phéromone à $\tau_0$
+\While{les conditions d'arrêt ne sont pas atteintes}
+  \State Construction de combinaisons par les fourmis
+  \State Mise à jour de la phéromone
+\EndWhile
+\State \Return la meilleure combinaison construite
+\end{algorithmic}
+\end{algorithm}
+
+\paragraph{Structure phéromonale.}
+La phéromone est utilisée pour biaiser les probabilités de choix des composants de combinaisons lors de la construction gloutonne aléatoire. Au début de l'exécution, toutes les traces de phéromone sont initialisées à une valeur $\tau_0$ donnée.
+
+\begin{quote}
+\textbf{Exemple 6.} Pour le problème du voyageur de commerce, une trace $\tau_{ij}$ est associée à chaque paire $(i, j)$ de villes.
+\end{quote}
+
+\paragraph{Construction de combinaisons par les fourmis.}
+À chaque cycle, chaque fourmi construit une combinaison selon un principe glouton aléatoire. Le prochain composant de combinaison est choisi selon la règle de transition probabiliste : étant donnés un début de combinaison $S$, et un ensemble $C$ de composants pouvant être ajoutés à $S$, la fourmi choisit le composant $i \in C$ selon la probabilité :
+\begin{equation}
+p_S(i) = \frac{[\tau_S(i)]^\alpha \cdot [\eta_S(i)]^\beta}{\sum_{j \in C} [\tau_S(j)]^\alpha \cdot [\eta_S(j)]^\beta}
+\label{eq:aco}
+\end{equation}
+où $\tau_S(i)$ est le facteur phéromonal associé au composant $i$, $\eta_S(i)$ est le facteur heuristique associé à $i$, et $\alpha$ et $\beta$ sont deux paramètres modulant l'influence relative des deux facteurs.
+
+\paragraph{Mise à jour de la phéromone.}
+Une fois que chaque fourmi a construit une combinaison, les traces de phéromone sont mises à jour. Elles sont tout d'abord diminuées en multipliant chaque trace par un facteur $(1 - \rho)$, où $\rho \in [0; 1]$ est le taux d'évaporation. Ensuite, certaines combinaisons sont ``récompensées'' par un dépôt de phéromone proportionnel à leur qualité.
+
+\section{Méta-heuristiques hybrides}
+\label{sec:hybrides}
+
+Les différentes méta-heuristiques présentées en~\ref{sec:perturbatives} et~\ref{sec:constructives} peuvent être combinées pour former de nouvelles méta-heuristiques.
+
+\subsection{Algorithmes mémétiques}
+
+Les algorithmes mémétiques combinent une méthode à population (algorithmes évolutionnaires) et la recherche locale~\cite{moscato1999,neri2011}. Cette hybridation vise à tirer profit du potentiel de diversification fourni par l'approche à population et de la capacité d'intensification offerte par la recherche locale.
+
+Un algorithme mémétique peut être considéré comme un algorithme génétique étendu par un processus de recherche locale. L'opérateur de mutation des algorithmes génétiques est remplacé par un processus de recherche locale, qui peut être considéré comme un processus guidé de macro-mutation.
+
+\subsection{Hybridation entre approches perturbatives et approches constructives}
+
+Les approches perturbatives et constructives sont très facilement hybridables : à chaque itération, une ou plusieurs combinaisons sont construites selon un principe glouton aléatoire (qui peut être guidé par EDA ou ACO), puis certaines de ces combinaisons sont améliorées par une procédure de recherche locale. Cette hybridation est connue sous le nom de GRASP (\textit{Greedy Randomized Adaptive Search Procedure})~\cite{resende2003}.
+
+\section{Intensification versus diversification}
+\label{sec:intensification}
+
+Pour les différentes approches heuristiques présentées dans ce chapitre, un point critique dans la mise au point de l'algorithme consiste à trouver un juste compromis entre deux tendances duales :
+\begin{itemize}
+  \item il s'agit d'une part d'\textit{intensifier} l'effort de recherche vers les zones les plus ``prometteuses'' de l'espace des combinaisons, c'est-à-dire, aux alentours des meilleures combinaisons trouvées ;
+  \item il s'agit par ailleurs de \textit{diversifier} l'effort de recherche de façon à être capable de découvrir de nouvelles zones contenant (potentiellement) de meilleures combinaisons.
+\end{itemize}
+
+En général, plus on intensifie la recherche d'un algorithme, plus il converge rapidement. Cependant, si l'on intensifie trop la recherche, l'algorithme risque fort de ``stagner'' autour d'optima locaux. Le bon équilibre entre intensification et diversification dépend également de la topologie du paysage de recherche.
+
+Différentes approches ont proposé d'adapter dynamiquement le paramétrage au cours de la résolution, en fonction de l'instance à résoudre. On parle alors de recherche réactive~\cite{battiti2008}.
+
+\section{Applications en intelligence artificielle}
+\label{sec:applications}
+
+Les méta-heuristiques ont été appliquées avec succès à un très grand nombre de problèmes classiques NP-difficiles. Dans cette partie, nous évoquons leur application à deux problèmes centraux en intelligence artificielle : la satisfiabilité de formules booléennes (SAT) et la satisfaction des contraintes (CSP).
+
+\subsection{Satisfiabilité de formules booléennes}
+\label{sec:sat}
+
+SAT est un des problèmes centraux en intelligence artificielle. Il s'agit, pour une formule booléenne, de déterminer un modèle, à savoir une affectation d'une valeur booléenne (vrai ou faux) à chaque variable telle que la valuation de la formule soit vraie.
+
+Les méta-heuristiques considèrent un problème plus général appelé MAXSAT dont l'objectif est de trouver la valuation maximisant le nombre de clauses satisfaites. L'espace de recherche d'une instance SAT est défini par l'ensemble des affectations de valeurs booléennes à l'ensemble des variables. Ainsi, pour une instance ayant $n$ variables, la taille de l'espace est $2^n$.
+
+\subsubsection*{Recherche locale stochastique}
+
+Les algorithmes RLS dédiés à SAT considèrent généralement la même fonction de voisinage : deux combinaisons sont voisines si la distance de Hamming entre elles est exactement de 1. Les algorithmes RLS diffèrent essentiellement dans les techniques mises en œuvre pour trouver un bon compromis entre exploration et exploitation.
+
+\paragraph{Exploitation de la structure de l'instance.}
+On peut distinguer trois niveaux d'exploitation de cette structure.
+
+La recherche peut être guidée par la \textit{fonction objectif} : l'exemple typique est l'algorithme emblématique GSAT~\cite{selman1992} qui, à chaque itération, sélectionne aléatoirement une configuration voisine parmi celles minimisant le nombre de clauses falsifiées.
+
+La recherche peut être également guidée par les \textit{conflits} : l'archétype est WALKSAT~\cite{mcallester1997} qui, à chaque itération, choisit aléatoirement une clause parmi celles falsifiées par la combinaison courante.
+
+Enfin, l'exploitation déductive des contraintes permet d'utiliser des règles de déduction pour modifier la combinaison courante.
+
+\paragraph{Exploitation de l'historique de recherche.}
+On peut distinguer trois niveaux d'exploitation de cet historique.
+
+Pour les \textit{algorithmes Markoviens} (ou sans mémoire), le choix de chaque nouvelle combinaison ne dépend que de la combinaison courante. GSAT, GRSAT, WALKSAT/SKC et le recuit simulé en sont des exemples typiques.
+
+Pour les \textit{algorithmes avec mémoire à court terme}, le choix prend en compte un historique des modifications des valeurs des variables. Les solveurs SAT inspirés de la méthode taboue, tels que WALKSAT/TABU ou TSAT, en sont des exemples typiques.
+
+Pour les \textit{algorithmes avec mémoire à long terme}, le choix dépend des choix réalisés depuis le début de la recherche. L'idée est d'utiliser un mécanisme d'apprentissage pour tirer parti des échecs et accélérer la recherche. Des exemples comprennent notamment DLM~\cite{shang1998}, DDWF~\cite{ishtaiwi2005}, PAWS~\cite{thornton2004}, SAPS~\cite{hutter2002} et WV~\cite{prestwich2005}.
+
+\subsubsection*{Algorithmes à base de population}
+
+Les algorithmes génétiques ont été appliqués à plusieurs reprises à SAT~\cite{dejong1989,crawford1993,hao1994}. Un algorithme mémétique intégrant un croisement sémantique et une recherche taboue~\cite{fleurent1996} a donné des résultats très intéressants lors du deuxième challenge DIMACS. GASAT~\cite{lardeux2006} introduit une nouvelle classe de croisements visant à corriger les ``erreurs'' des parents et combiner leurs bonnes caractéristiques.
+
+\subsection{Problèmes de satisfaction de contraintes}
+\label{sec:csp}
+
+Un problème de satisfaction de contraintes (\textit{Constraint Satisfaction Problem} ; CSP) est un problème modélisé sous la forme d'un ensemble de contraintes posées sur des variables, chacune de ces variables prenant ses valeurs dans un domaine. Résoudre un CSP consiste à affecter des valeurs aux variables, de telle sorte que toutes les contraintes soient satisfaites.
+
+Comme pour SAT, on considère généralement le problème d'optimisation MaxCSP dont l'objectif est de trouver l'affectation complète maximisant le nombre de contraintes satisfaites.
+
+\subsubsection*{Algorithmes génétiques}
+
+Dans sa forme la plus simple, un algorithme génétique pour la résolution de CSP utilise une population d'affectations complètes qui sont recombinées par simple croisement, la mutation consistant à changer la valeur d'une variable. Les meilleurs algorithmes génétiques ne sont cependant clairement pas compétitifs, ni avec les approches exactes basées sur une recherche arborescente, ni avec d'autres approches heuristiques~\cite{hemert2004}.
+
+\subsubsection*{Recherche locale}
+
+Il existe de très nombreux travaux concernant la résolution de CSP par des techniques de recherche locale. Les algorithmes diffèrent essentiellement par le voisinage et la stratégie de choix considérés.
+
+La stratégie min-conflict~\cite{minton1992} consiste à choisir aléatoirement une variable impliquée dans au moins une violation de contrainte et à choisir pour cette variable la valeur qui minimise le nombre de violations. La recherche locale utilisant une stratégie taboue (TabuCSP)~\cite{galinier1997} obtient d'excellents résultats pour la résolution de CSPs binaires.
+
+\subsubsection*{Algorithmes de construction gloutonne}
+
+On peut construire une affectation totale pour un CSP selon le principe glouton suivant : partant d'une affectation vide, on sélectionne à chaque itération une variable non affectée et une valeur à affecter à cette variable. Un exemple bien connu est l'algorithme DSATUR~\cite{brelaz1979} pour résoudre le problème de coloriage de graphes.
+
+\subsubsection*{Optimisation par colonies de fourmis}
+
+La méta-heuristique ACO a été appliquée à la résolution de CSP dans~\cite{solnon2002,solnon2008}. L'idée est de construire des affectations complètes selon un principe glouton aléatoire. La contribution principale d'ACO est de fournir une heuristique de choix de valeur dont la probabilité dépend d'un facteur heuristique et d'un facteur phéromonal. L'optimisation par colonies de fourmis a également été intégrée dans les bibliothèques de résolution de CSP IBM/Ilog Solver et CP Optimizer~\cite{khichane2008,khichane2010}.
+
+\section{Discussion}
+\label{sec:discussion}
+
+Les méta-heuristiques ont été utilisées avec succès pour résoudre de nombreux problèmes d'optimisation difficiles. La variété des méta-heuristiques pose naturellement le problème du choix de celle qui sera la plus efficace pour résoudre un nouveau problème. En particulier, le choix d'une méta-heuristique dépend de la pertinence de ses mécanismes de base :
+\begin{itemize}
+  \item Pour les AG, l'opérateur de recombinaison doit être capable d'identifier les bons motifs qui doivent être assemblés et hérités par recombinaison.
+  \item Dans le cas de la recherche locale, le voisinage doit favoriser la construction de meilleures combinaisons.
+  \item Pour ACO, la structure phéromonale doit être capable de guider la recherche vers de meilleures combinaisons.
+\end{itemize}
+
+Enfin, les méta-heuristiques ont bien souvent de nombreux paramètres qui ont une influence prépondérante sur leur efficacité. Une approche prometteuse pour résoudre ce problème de configuration consiste à utiliser des algorithmes de configuration automatiques~\cite{xu2010}.
+
+% =========================================================
+\bibliographystyle{plain}
+\begin{thebibliography}{99}
+
+\bibitem{aarts1989}
+E.~H.~L. Aarts and J.~H.~M. Korst.
+\newblock \textit{Simulated annealing and Boltzmann machines}.
+\newblock John Wiley \& Sons, 1989.
+
+\bibitem{baluja1994}
+S.~Baluja.
+\newblock Population-based incremental learning.
+\newblock Technical report, Carnegie Mellon University, 1994.
+
+\bibitem{battiti2008}
+R.~Battiti, M.~Brunato, and F.~Mascia.
+\newblock \textit{Reactive Search and Intelligent Optimization}.
+\newblock Springer Verlag, 2008.
+
+\bibitem{battiti2001}
+R.~Battiti and M.~Protasi.
+\newblock Reactive local search for the maximum clique problem.
+\newblock \textit{Algorithmica}, 29(4):610--637, 2001.
+
+\bibitem{brelaz1979}
+D.~Brélaz.
+\newblock New methods to color the vertices of a graph.
+\newblock \textit{CACM}, 22(4):251--256, 1979.
+
+\bibitem{craenen2003}
+B.~G.~W. Craenen, A.~E. Eiben, and J.~I. van Hemert.
+\newblock Comparing evolutionary algorithms on binary constraint satisfaction problems.
+\newblock \textit{IEEE Trans.\ Evolutionary Computation}, 7(5):424--444, 2003.
+
+\bibitem{crawford1993}
+J.~M. Crawford and L.~Auton.
+\newblock Experimental results on the cross-over point in satisfiability problems.
+\newblock In \textit{Proc.\ AAAI}, pages 22--28, 1993.
+
+\bibitem{dejong1989}
+K.~A. De~Jong and W.~M. Spears.
+\newblock Using genetic algorithms to solve NP-complete problems.
+\newblock In \textit{ICGA'89}, pages 124--132, 1989.
+
+\bibitem{eiben2003}
+A.~E. Eiben and J.~E. Smith.
+\newblock \textit{Introduction to Evolutionary Computing}.
+\newblock Springer, 2003.
+
+\bibitem{feo1989}
+T.~A. Feo and M.~G.~C. Resende.
+\newblock A probabilistic heuristic for a computationally difficult set covering problem.
+\newblock \textit{Operations Research Letter}, 8:67--71, 1989.
+
+\bibitem{fleurent1996}
+C.~Fleurent and J.~A. Ferland.
+\newblock Object-oriented implementation of heuristic search methods for graph coloring, maximum clique, and satisfiability.
+\newblock \textit{DIMACS Series}, 26:619--652, 1996.
+
+\bibitem{galinier1997}
+P.~Galinier and J.-K. Hao.
+\newblock Tabu search for maximal constraint satisfaction problems.
+\newblock In \textit{CP}, LNCS 1330, pages 196--208. Springer, 1997.
+
+\bibitem{galinier1999}
+P.~Galinier and J.-K. Hao.
+\newblock Hybrid evolutionary algorithms for graph coloring.
+\newblock \textit{J.\ Combinatorial Optimization}, 3(4):379--397, 1999.
+
+\bibitem{glover1993}
+F.~Glover and M.~Laguna.
+\newblock Tabu search.
+\newblock In C.~R. Reeves, editor, \textit{Modern Heuristics Techniques for Combinatorial Problems}, pages 70--141. Blackwell, 1993.
+
+\bibitem{goldberg1989}
+D.~E. Goldberg.
+\newblock \textit{Genetic algorithms in search, optimization and machine learning}.
+\newblock Addison-Wesley, 1989.
+
+\bibitem{holland1975}
+J.~H. Holland.
+\newblock \textit{Adaptation and artificial systems}.
+\newblock University of Michigan Press, 1975.
+
+\bibitem{hoos2005}
+H.~H. Hoos and T.~Stützle.
+\newblock \textit{Stochastic local search, foundations and applications}.
+\newblock Morgan Kaufmann, 2005.
+
+\bibitem{hutter2002}
+F.~Hutter, D.~A.~D. Tompkins, and H.~H. Hoos.
+\newblock Scaling and probabilistic smoothing.
+\newblock In \textit{CP 2002}, LNCS, pages 233--248. Springer, 2002.
+
+\bibitem{ishtaiwi2005}
+A.~Ishtaiwi, J.~Thornton, A.~Sattar, and D.~N. Pham.
+\newblock Neighbourhood clause weight redistribution in local search for SAT.
+\newblock In \textit{CP 2005}, pages 772--776, 2005.
+
+\bibitem{khichane2008}
+M.~Khichane, P.~Albert, and C.~Solnon.
+\newblock Integration of ACO in a constraint programming language.
+\newblock In \textit{ANTS'08}, LNCS 5217, pages 84--95. Springer, 2008.
+
+\bibitem{khichane2010}
+M.~Khichane, P.~Albert, and C.~Solnon.
+\newblock Strong integration of ant colony optimization with constraint programming.
+\newblock In \textit{CPAIOR 2010}. Springer, 2010.
+
+\bibitem{larranaga2001}
+P.~Larrañaga and J.~A. Lozano.
+\newblock \textit{Estimation of Distribution Algorithms}.
+\newblock Kluwer Academic Publishers, 2001.
+
+\bibitem{lardeux2006}
+F.~Lardeux, F.~Saubion, and J.-K. Hao.
+\newblock GASAT: a genetic local search algorithm for the satisfiability problem.
+\newblock \textit{Evolutionary Computation}, 14(2):223--253, 2006.
+
+\bibitem{lourenco2002}
+H.~R. Lourenço, O.~Martin, and T.~Stuetzle.
+\newblock Iterated local search.
+\newblock In \textit{Handbook of Metaheuristics}, pages 321--353. Kluwer, 2002.
+
+\bibitem{mcallester1997}
+D.~McAllester, B.~Selman, and H.~Kautz.
+\newblock Evidence for invariants in local search.
+\newblock In \textit{AAAI 97}, 1997.
+
+\bibitem{minton1992}
+S.~Minton, M.~D. Johnston, A.~B. Philips, and P.~Laird.
+\newblock Minimizing conflicts: a heuristic repair method for constraint satisfaction and scheduling problems.
+\newblock \textit{Artificial Intelligence}, 58:161--205, 1992.
+
+\bibitem{mladenovic1997}
+N.~Mladenović and P.~Hansen.
+\newblock Variable neighborhood search.
+\newblock \textit{Computers in Operations Research}, 24:1097--1100, 1997.
+
+\bibitem{moscato1999}
+P.~Moscato.
+\newblock Memetic algorithms: a short introduction.
+\newblock In \textit{New Ideas in Optimization}, pages 219--234. McGraw-Hill, 1999.
+
+\bibitem{neri2011}
+F.~Neri, C.~Cotta, and P.~Moscato (Eds.).
+\newblock \textit{Handbook of memetic algorithms}.
+\newblock Springer, 2011.
+
+\bibitem{pelikan1999}
+M.~Pelikan, D.~E. Goldberg, and E.~Cantú-Paz.
+\newblock BOA: The Bayesian optimization algorithm.
+\newblock In \textit{GECCO-99}, volume I, pages 525--532. Morgan Kaufmann, 1999.
+
+\bibitem{prestwich2005}
+S.~Prestwich.
+\newblock Random walk with continuously smoothed variable weights.
+\newblock In \textit{SAT 2005}, 2005.
+
+\bibitem{resende2003}
+M.~G.~C. Resende and C.~C. Ribeiro.
+\newblock Greedy randomized adaptive search procedures.
+\newblock In \textit{Handbook of Metaheuristics}, pages 219--249. Kluwer, 2003.
+
+\bibitem{selman1992}
+B.~Selman, H.~Levesque, and D.~Mitchell.
+\newblock A new method for solving hard satisfiability problems.
+\newblock In \textit{AAAI}, pages 440--446, 1992.
+
+\bibitem{selman1994noise}
+B.~Selman, H.~A. Kautz, and B.~Cohen.
+\newblock Noise strategies for improving local search.
+\newblock In \textit{Proc.\ AAAI}, pages 337--343, 1994.
+
+\bibitem{shang1998}
+Y.~Shang and B.~W. Wah.
+\newblock A discrete Lagrangian based global search method for solving satisfiability problems.
+\newblock \textit{J.\ Global Optimization}, 12:61--100, 1998.
+
+\bibitem{solnon2002}
+C.~Solnon.
+\newblock Ants can solve constraint satisfaction problems.
+\newblock \textit{IEEE Trans.\ Evolutionary Computation}, 6(4):347--357, 2002.
+
+\bibitem{solnon2008}
+C.~Solnon.
+\newblock \textit{Optimisation par colonies de fourmis}.
+\newblock Hermès-Lavoisier, 2008.
+
+\bibitem{thornton2004}
+J.~Thornton, D.~N. Pham, S.~Bain, and V.~Jr. Ferreira.
+\newblock Additive versus multiplicative clause weighting for SAT.
+\newblock In \textit{AAAI 2004}, pages 191--196, 2004.
+
+\bibitem{hemert2004}
+J.~I. van Hemert and C.~Solnon.
+\newblock A study into ant colony optimization, evolutionary computation and constraint programming on binary CSPs.
+\newblock In \textit{EvoCOP 2004}, LNCS 3004, pages 114--123. Springer, 2004.
+
+\bibitem{hao1994}
+J.-K. Hao and R.~Dorne.
+\newblock An empirical comparison of two evolutionary methods for satisfiability problems.
+\newblock In \textit{Proc.\ IEEE Intl.\ Conf.\ on Evolutionary Computation}, pages 450--455, 1994.
+
+\bibitem{xu2010}
+L.~Xu, H.~H. Hoos, and K.~Leyton-Brown.
+\newblock Hydra: Automatically configuring algorithms for portfolio-based selection.
+\newblock In \textit{AAAI 2010}, pages 210--216, 2010.
+
+\bibitem{zlochin2004}
+M.~Zlochin, M.~Birattari, N.~Meuleau, and M.~Dorigo.
+\newblock Model-based search for combinatorial optimization: A critical survey.
+\newblock \textit{Annals of Operations Research}, 131:373--395, 2004.
+
+\end{thebibliography}
+
+\end{document}

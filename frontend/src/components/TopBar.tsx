@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useState } from "react";
-import { Menu, FileCheck, FileX, Sun, Moon } from "lucide-react";
+import { Menu, FileCheck, FileX } from "lucide-react";
 import { getHealth } from "../api/client";
-import { useTheme } from "../contexts/ThemeContext";
 import type { HealthStatus } from "../types/api";
 
 interface Props {
@@ -37,7 +36,6 @@ function StatusIndicator({ ok, label }: { ok: boolean; label: string }) {
 
 function TopBar({ title, subtitle, onMenuClick }: Props) {
   const [health, setHealth] = useState<HealthStatus | null>(null);
-  const { theme, toggle } = useTheme();
 
   const fetchHealth = useCallback(() => {
     getHealth().then(setHealth).catch(() => setHealth(null));
@@ -52,7 +50,7 @@ function TopBar({ title, subtitle, onMenuClick }: Props) {
   return (
     <header className="flex items-center gap-4 px-5 py-3 border-b border-border bg-bg-secondary sticky top-0 z-10">
       <button
-        className="lg:hidden p-1.5 rounded-lg text-text-dim hover:text-text-primary hover:bg-bg-hover transition-colors duration-150"
+        className="lg:hidden p-1.5 text-text-dim hover:text-text-primary hover:bg-bg-hover transition-colors duration-150"
         onClick={onMenuClick}
         aria-label="Ouvrir le menu"
       >
@@ -77,19 +75,6 @@ function TopBar({ title, subtitle, onMenuClick }: Props) {
           ))}
         </div>
       )}
-
-      <button
-        className="p-1.5 rounded-lg text-text-dim hover:text-text-primary hover:bg-bg-hover
-                   transition-colors duration-150 flex-shrink-0"
-        onClick={toggle}
-        aria-label={theme === "dark" ? "Passer en thème clair" : "Passer en thème sombre"}
-        title={theme === "dark" ? "Thème clair" : "Thème sombre"}
-      >
-        {theme === "dark"
-          ? <Sun  className="w-4 h-4" aria-hidden="true" />
-          : <Moon className="w-4 h-4" aria-hidden="true" />
-        }
-      </button>
     </header>
   );
 }

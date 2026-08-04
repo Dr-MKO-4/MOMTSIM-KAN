@@ -34,6 +34,7 @@ class TorchParameters:
         self.client_profiles_df = pd.read_csv(f"{param_dir}/clientsProfiles.csv")
         self.agg_df = pd.read_csv(f"{param_dir}/aggregatedTransactions.csv")
         self.balances_df = pd.read_csv(f"{param_dir}/initialBalancesDistribution.csv")
+        self.agent_float_df = pd.read_csv(f"{param_dir}/agentFloatDistribution.csv")
         self.overdraft_df = pd.read_csv(f"{param_dir}/overdraftLimits.csv")
         self.max_occ_df = pd.read_csv(f"{param_dir}/maxOccurrencesPerClient.csv")
 
@@ -81,11 +82,12 @@ class TorchParameters:
         init_balance = self.rng.uniform(lo[bin_idx], hi[bin_idx])
         self.initial_balance = torch.tensor(init_balance, dtype=torch.float32, device=DEVICE)
 
-        # découvert : basé sur mean_amount global du client (moyenne des profils dispos)
+        # Mobile Money CEMAC : pas de découvert — le solde ne peut pas être négatif.
+        # On force overdraft_limit = 0 quelle que soit la valeur dans le CSV.
         mean_global = mean_mat[np.arange(n)[:, None], np.arange(len(self.ACTIONS))].mean(axis=1)
         overdraft = np.zeros(n)
         for i, m in enumerate(mean_global):
-            overdraft[i] = self._overdraft_for(m)
+            overdraft[i] = max(0.0, self._overdraft_for(m))  # clamp ≥ 0
         self.overdraft_limit = torch.tensor(overdraft, dtype=torch.float32, device=DEVICE)
         self.equilibrium = torch.clamp(torch.tensor(40 * mean_global, dtype=torch.float32,
                                                       device=DEVICE), min=1.0)
@@ -100,6 +102,15 @@ class TorchParameters:
         self.target_total_count = torch.tensor(target_counts, dtype=torch.float32, device=DEVICE)
         total = self.target_total_count.sum()
         self.client_weight = self.target_total_count / total if total > 0 else torch.zeros(n, device=DEVICE)
+
+    def sample_agent_float(self, n: int) -> np.ndarray:
+        """Tire n valeurs de float initial pour les agents distributeurs/banques
+        selon agentFloatDistribution.csv — §3.2.4 du mémoire, \citet{gsma2010agents,ifc2017liquidity}."""
+        lo = self.agent_float_df["range_min"].values
+        hi = self.agent_float_df["range_max"].values
+        props = self.agent_float_df["proportion"].values / self.agent_float_df["proportion"].values.sum()
+        bin_idx = self.rng.choice(len(self.agent_float_df), size=n, p=props)
+        return self.rng.uniform(lo[bin_idx], hi[bin_idx])
 
     def _overdraft_for(self, mean_amount: float) -> float:
         for _, row in self.overdraft_df.iterrows():
@@ -155,11 +166,23 @@ class TorchMoMTSimEngine:
 
         self.balance = torch.zeros(self.n_actors, dtype=torch.float32, device=DEVICE)
         self.balance[:n_clients] = params.initial_balance
-        # mules : soldes initiaux faibles/nuls (comptes créés pour la fraude)
+        # Float initial des agents distributeurs et banques (§3.2.4 — GSMA 2010 / IFC 2017).
+        # Tiré depuis agentFloatDistribution.csv : petits agents 100k-500k FCFA (60 %),
+        # agents moyens 500k-2M FCFA (30 %), grands agents/banques 2M-10M FCFA (10 %).
+        n_agents = n_merchants + n_banks
+        agent_float = params.sample_agent_float(n_agents)
+        self.balance[self.MERCHANT_OFFSET:self.MULE_OFFSET] = torch.tensor(
+            agent_float, dtype=torch.float32, device=DEVICE)
+        # mules : soldes initiaux nuls (comptes créés pour la fraude)
         self.balance[self.MULE_OFFSET:self.MULE_OFFSET + n_mules] = 0.0
 
-        self.overdraft_limit = torch.zeros(self.n_actors, dtype=torch.float32, device=DEVICE)
-        self.overdraft_limit[:n_clients] = params.overdraft_limit
+        # Règle CEMAC : solde abonnés ≥ 0. Agents : plancher -1e9 pour les opérations
+        # légitimes (CASH_IN bilatéral — flux physique compensatoire documenté).
+        _AGENT_FLOOR = -1e9
+        self.overdraft_limit = torch.full((self.n_actors,), _AGENT_FLOOR,
+                                           dtype=torch.float32, device=DEVICE)
+        # Clients abonnés : solde ≥ 0 imposé
+        self.overdraft_limit[:n_clients] = torch.clamp(params.overdraft_limit, min=0.0)
 
         # marchands "high risk" (90% comme dans le doc MoMTSim, réutilisé comme
         # registre de vulnérabilité par défaut pour Refund Fraud)
@@ -181,6 +204,7 @@ class TorchMoMTSimEngine:
 
         # buffer plat pour toutes les transactions générées (préalloué puis tronqué)
         self.log_step = []
+        self.log_time_s = []   # secondes dans le step (précision intra-step ATO/SplitDep)
         self.log_action = []
         self.log_amount = []
         self.log_orig = []
@@ -196,7 +220,16 @@ class TorchMoMTSimEngine:
 
     # ------------------------------------------------------------------
     def _spring_probabilities(self):
-        """Vectorisé sur tous les clients : éq. section 3.3."""
+        """Vectorisé sur tous les clients : modèle de rappel vers l'équilibre.
+
+        Principe (Azamuke et al., 2024 — modèle markovien de comportement client) :
+          k             = 1 / équilibre_cible
+          spring_force  = k · (équilibre - solde_courant)   ∈ [-1, +1]
+          p_in          = clamp(0.5 · (1 + spring_force + (p_in_base - p_out_base)))
+
+        Un client sous-équilibré (solde < équilibre) reçoit une force positive
+        qui augmente sa probabilité de faire des dépôts (IN), et inversement.
+        """
         k = 1.0 / self.params.equilibrium
         client_balance = self.balance[:self.n_clients]
         spring_force = k * (self.params.equilibrium - client_balance)
@@ -227,8 +260,9 @@ class TorchMoMTSimEngine:
         rows = torch.arange(n, device=DEVICE)
         mu_client = self.params.mean_amount_tensor[rows, action_idx]
         std_client = self.params.std_amount_tensor[rows, action_idx]
-        mu_step = self.params.step_avg[step, action_idx]
-        std_step = self.params.step_std[step, action_idx]
+        _step_idx = step % self.params.step_avg.shape[0]
+        mu_step = self.params.step_avg[_step_idx, action_idx]
+        std_step = self.params.step_std[_step_idx, action_idx]
 
         mu = (mu_client + mu_step) / 2
         sigma = torch.sqrt(std_client**2 + std_step**2) / 2
@@ -290,7 +324,24 @@ class TorchMoMTSimEngine:
     # ------------------------------------------------------------------
     def _run_step_slot(self, step: int, slot_mask: torch.Tensor):
         """Traite un slot de transaction pour tous les clients marqués actifs
-        dans slot_mask (tenseur bool de taille n_clients)."""
+        dans slot_mask (tenseur bool de taille n_clients).
+
+        Sémantique des flux bilatéraux (section 3.1 du mémoire) :
+          IN  (CASH_IN, DEPOSIT) : l'agent/banque (dest) cède de la liquidité digitale
+              au client (orig). Flux : dest → orig.
+              → balance[orig] += amount  (client gagne)
+              → balance[dest] -= amount  (agent de liquidité cède son float)
+              Condition : le client est toujours actif (pas de contrainte de solde
+              côté client pour recevoir). L'agent peut descendre en négatif (float).
+
+          OUT (CASH_OUT, DEBIT, PAYMENT, TRANSFER) : le client envoie. Flux : orig → dest.
+              → balance[orig] -= amount  (client perd)
+              → balance[dest] += amount  (contrepartie gagne)
+              Condition : solde client ≥ amount (overdraft_limit = 0 au CEMAC).
+
+          Les marchands/banques ont un floor = -1e9 (float agent).
+          Les clients abonnés ont un floor = 0 (règle CEMAC).
+        """
         n = self.n_clients
         in_prob, _ = self._spring_probabilities()
         action_idx = self._draw_action_indices(in_prob)
@@ -298,16 +349,32 @@ class TorchMoMTSimEngine:
         dest_idx = self._draw_counterparties(action_idx)
 
         orig_idx = torch.arange(n, device=DEVICE)
-        can_pay = (self.balance[orig_idx] - amounts) >= self.overdraft_limit[orig_idx]
-        active = slot_mask & can_pay
+
+        # Masque actions IN (CASH_IN, DEPOSIT)
+        _in_indices = torch.tensor(
+            [j for j, a in enumerate(self.params.ACTIONS) if a in self.params.IN_ACTIONS],
+            device=DEVICE)
+        is_in_action = torch.isin(action_idx, _in_indices)
+
+        # OUT : le client doit avoir assez (solde ≥ 0 CEMAC)
+        can_pay_out = (self.balance[orig_idx] - amounts) >= self.overdraft_limit[orig_idx]
+
+        active_in  = slot_mask & is_in_action           # IN : client reçoit (toujours ok)
+        active_out = slot_mask & ~is_in_action & can_pay_out  # OUT : client envoie si solde ok
+        active     = active_in | active_out
 
         old_orig = self.balance[orig_idx].clone()
         old_dest = self.balance[dest_idx].clone()
 
-        # scatter séquentiellement cohérent : withdraw puis deposit, uniquement actifs
-        withdraw_amounts = torch.where(active, amounts, torch.zeros_like(amounts))
-        self.balance.index_add_(0, orig_idx, -withdraw_amounts)
-        self.balance.index_add_(0, dest_idx, withdraw_amounts)
+        # IN : dest (agent/banque) → orig (client)  — flux bilatéral inversé
+        in_amounts = torch.where(active_in, amounts, torch.zeros_like(amounts))
+        self.balance.index_add_(0, orig_idx,  in_amounts)   # client +
+        self.balance.index_add_(0, dest_idx, -in_amounts)   # agent  -
+
+        # OUT : orig (client) → dest (marchand/client/banque)
+        out_amounts = torch.where(active_out, amounts, torch.zeros_like(amounts))
+        self.balance.index_add_(0, orig_idx, -out_amounts)  # client -
+        self.balance.index_add_(0, dest_idx,  out_amounts)  # dest   +
 
         already_known = (self.history_buf == dest_idx.unsqueeze(1)).any(dim=1)
         is_new = ~already_known
@@ -318,6 +385,7 @@ class TorchMoMTSimEngine:
         if active_np.any():
             action_names = np.array(self.params.ACTIONS)[action_idx.cpu().numpy()]
             self.log_step.extend([step] * active_np.sum())
+            self.log_time_s.extend([0.0] * active_np.sum())
             self.log_action.extend(action_names[active_np].tolist())
             self.log_amount.extend(amounts[active].cpu().numpy().tolist())
             self.log_orig.extend(orig_idx[active].cpu().numpy().tolist())
@@ -353,22 +421,48 @@ class TorchMoMTSimEngine:
 
     def to_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame({
-            "step": self.log_step, "action": self.log_action, "amount": self.log_amount,
-            "nameOrig": self.log_orig, "nameDest": self.log_dest,
-            "oldBalanceOrig": self.log_old_orig, "newBalanceOrig": self.log_new_orig,
-            "oldBalanceDest": self.log_old_dest, "newBalanceDest": self.log_new_dest,
-            "isSuccessful": self.log_success, "isFraud": self.log_is_fraud,
-            "isFlaggedFraud": self.log_is_flagged, "fraudScenario": self.log_scenario,
+            "step":           np.array(self.log_step,        dtype=np.int32),
+            "time_s":         np.array(self.log_time_s,      dtype=np.float32),
+            "action":         self.log_action,
+            "amount":         np.array(self.log_amount,      dtype=np.float32),
+            "nameOrig":       np.array(self.log_orig,        dtype=np.int32),
+            "nameDest":       np.array(self.log_dest,        dtype=np.int32),
+            "oldBalanceOrig": np.array(self.log_old_orig,    dtype=np.float32),
+            "newBalanceOrig": np.array(self.log_new_orig,    dtype=np.float32),
+            "oldBalanceDest": np.array(self.log_old_dest,    dtype=np.float32),
+            "newBalanceDest": np.array(self.log_new_dest,    dtype=np.float32),
+            "isSuccessful":   np.array(self.log_success,     dtype=np.bool_),
+            "isFraud":        np.array(self.log_is_fraud,    dtype=np.bool_),
+            "isFlaggedFraud": np.array(self.log_is_flagged,  dtype=np.bool_),
+            "fraudScenario":  self.log_scenario,
         })
+
+    def flush_log(self) -> pd.DataFrame:
+        """Retourne le DataFrame des transactions accumulées et vide les listes."""
+        df = self.to_dataframe()
+        self.log_step.clear();     self.log_time_s.clear()
+        self.log_action.clear();   self.log_amount.clear()
+        self.log_orig.clear();     self.log_dest.clear()
+        self.log_old_orig.clear(); self.log_new_orig.clear()
+        self.log_old_dest.clear(); self.log_new_dest.clear()
+        self.log_success.clear();  self.log_is_fraud.clear()
+        self.log_is_flagged.clear(); self.log_scenario.clear()
+        return df
 
     # ------------------------------------------------------------------
     def log_transaction(self, step: int, action: str, amount: float,
                          orig_idx: int, dest_idx: int, old_orig: float, new_orig: float,
                          old_dest: float, new_dest: float, is_fraud: bool = True,
-                         is_flagged: bool = False, scenario: str = None, success: bool = True):
+                         is_flagged: bool = False, scenario: str = None,
+                         success: bool = True, time_s: float = 0.0):
         """Point d'entrée unique utilisé par les fraudeurs pour journaliser
-        une transaction générée hors du flux légitime standard."""
+        une transaction générée hors du flux légitime standard.
+
+        time_s : secondes dans le step courant (précision intra-step pour ATO
+                 et Split Deposit — cf. scénarios 3.2.1 et 3.2.4 du mémoire).
+        """
         self.log_step.append(step)
+        self.log_time_s.append(float(time_s))
         self.log_action.append(action)
         self.log_amount.append(float(amount))
         self.log_orig.append(int(orig_idx))
@@ -381,6 +475,15 @@ class TorchMoMTSimEngine:
         self.log_is_fraud.append(is_fraud)
         self.log_is_flagged.append(is_flagged)
         self.log_scenario.append(scenario)
+
+    def rebalance_agents(self, params) -> None:
+        """Réapprovisionne le float e-money des agents/banques toutes les 24 steps
+        (simulation du cycle de rebalancement quotidien documenté par GSMA 2010).
+        Les clients et les mules ne sont pas affectés."""
+        n_agents = self.n_merchants + self.n_banks
+        new_float = params.sample_agent_float(n_agents)
+        self.balance[self.MERCHANT_OFFSET:self.MULE_OFFSET] = torch.tensor(
+            new_float, dtype=torch.float32, device=DEVICE)
 
     def transfer(self, orig_idx: int, dest_idx: int, amount: float) -> tuple:
         """Effectue un virement entre deux acteurs (indices globaux) sur le
@@ -442,8 +545,9 @@ class TorchFraudInjector:
         self._refund_merchant_idx: int = 0
         self._refund_cycle_count: int = 0
 
-        # Smurfing : émetteur ≠ récepteur garanti
-        n_networks = 5
+        # Smurfing : nombre de réseaux proportionnel aux mules disponibles
+        # (2 réseaux par mule en moyenne pour assurer suffisamment de volume)
+        n_networks = max(5, engine.n_mules * 2)
         self.smurf_networks = []
         for _ in range(n_networks):
             emitter = int(self.gen.choice(self.client_ids))
@@ -459,18 +563,26 @@ class TorchFraudInjector:
                 "next_op_step": int(self.gen.integers(0, 30 * 24)),
             })
 
+        # Nombre d'injections fraude par step : proportionnel au nombre de mules
+        # pour que le taux de fraude cible (~23%) soit atteignable par SPSA.
+        # Référence : n_mules >= 300 garantit un taux max >23% sur step_target_count réel.
+        self._n_inject_per_step = max(1, engine.n_mules)
+
     # ------------------------------------------------------------------
-    def _log(self, step, action, amount, orig, dest, scenario, flagged=False):
+    def _log(self, step, action, amount, orig, dest, scenario,
+              flagged=False, time_s=0.0):
         old_o, new_o, old_d, new_d, success = self.engine.transfer(orig, dest, amount)
         self.engine.log_transaction(step, action, amount, orig, dest, old_o, new_o, old_d, new_d,
-                                     is_fraud=True, is_flagged=flagged, scenario=scenario, success=success)
+                                     is_fraud=True, is_flagged=flagged, scenario=scenario,
+                                     success=success, time_s=time_s)
         return success
 
-    def _log_legit(self, step, action, amount, orig, dest):
+    def _log_legit(self, step, action, amount, orig, dest, time_s=0.0):
         """Transaction légitime de camouflage (is_fraud=False, is_flagged=False)."""
         old_o, new_o, old_d, new_d, success = self.engine.transfer(orig, dest, amount)
         self.engine.log_transaction(step, action, amount, orig, dest, old_o, new_o, old_d, new_d,
-                                     is_fraud=False, is_flagged=False, scenario=None, success=success)
+                                     is_fraud=False, is_flagged=False, scenario=None,
+                                     success=success, time_s=time_s)
         return success
 
     def _flush_pending(self, current_step: int):
@@ -495,16 +607,24 @@ class TorchFraudInjector:
             return
         n = int(self.gen.integers(c["n_min"], c["n_max"] + 1))
         chosen_mules = self.gen.choice(self.mule_ids, size=min(n, len(self.mule_ids)), replace=False)
+
+        # Timing intra-step : Δt_i ~ Exp(λ_ATO) (eq. scénario ATO, section 3.2.1)
+        # λ_ATO calibré pour fenêtre totale < 10 min (600 s) : mean Δt = 1/λ_ATO
+        lam_ato   = float(c.get("lambda_ato_per_s", 1.0 / 120))  # défaut : 2 min entre tx
+        raw_delays = self.gen.exponential(scale=1.0 / lam_ato, size=len(chosen_mules))
+        time_offsets_s = [float(v) for v in raw_delays.cumsum()]  # t0=0, t1, t2, ...
+
         remaining = B0
         total_exfil = 0.0
-        for mule in chosen_mules:
+        for i, mule in enumerate(chosen_mules):
             if remaining <= 0:
                 break
             frac = self.gen.uniform(c["frag_min"], c["frag_max"])
             amount = min(remaining, frac * B0)
             if amount <= 1:
                 continue
-            self._log(step, "TRANSFER", amount, victim, int(mule), "ATO")
+            self._log(step, "TRANSFER", amount, victim, int(mule), "ATO",
+                      time_s=time_offsets_s[i])
             remaining -= amount
             total_exfil += amount
         if total_exfil > 0:
@@ -553,6 +673,10 @@ class TorchFraudInjector:
     # 3.2.3 — Fake Credentials
     # ------------------------------------------------------------------
     def _fake_credentials_step(self, step: int, allow_new: bool):
+        # Libérer les comptes déjà activés pour permettre un renouvellement continu du pool
+        self._fake_cred_agents = {
+            k: v for k, v in self._fake_cred_agents.items() if not v["activated"]
+        }
         c = self.cfg["fake_credentials"]
         if allow_new and len(self._fake_cred_agents) < 200:
             cid = int(self.gen.choice(self.client_ids))
@@ -580,8 +704,14 @@ class TorchFraudInjector:
             elif step >= state["dormant_until"]:
                 dest = int(self.gen.choice(self.client_ids))
                 mean_amount = float(self.params.mean_amount_tensor[cid].mean().item())
-                plafond = max(mean_amount * 10, 50000)
+                # Calibre le plafond sur le solde réel disponible pour éviter les transfers nuls
+                solde_cid = float(self.engine.balance[cid].item())
+                if solde_cid <= 0:
+                    state["activated"] = True
+                    continue
+                plafond = min(max(mean_amount * 10, 50000), solde_cid)
                 amount = float(self.gen.uniform(c["m_exp_ratio_min"] * plafond, plafond))
+                amount = max(1.0, amount)
                 # is_flagged=False : le KYC n'a pas détecté l'usurpation — c'est l'essence du scénario
                 self._log(step, "TRANSFER", amount, cid, dest, "FAKE_CRED", flagged=False)
                 self._tracking["fake_credentials"].append({
@@ -634,8 +764,24 @@ class TorchFraudInjector:
         if float(self.engine.balance[agent].item()) < total_deposit:
             return
         fragments = self._optimal_fragmentation(total_deposit)
-        for frag in fragments:
-            self._log(step, "CASH_IN", frag, agent, client, "SPLIT_DEP")
+
+        # Fenêtre temporelle intra-step : T_split ~ U(60s, 120s) (section 3.2.4)
+        # Les k fragments sont répartis uniformément dans cette fenêtre
+        c_sd = self.cfg["split_deposit"]
+        T_split = float(self.gen.uniform(
+            c_sd.get("T_split_min_sec", 60),
+            c_sd.get("T_split_max_sec", 120),
+        ))
+        if len(fragments) > 1:
+            times_s = [float(v) for v in
+                       (T_split * i / (len(fragments) - 1)
+                        for i in range(len(fragments)))]
+        else:
+            times_s = [0.0]
+
+        for frag, t_s in zip(fragments, times_s):
+            self._log(step, "CASH_IN", frag, agent, client, "SPLIT_DEP",
+                      time_s=t_s)
         self._tracking["split_deposit"].append({
             "step": step, "agent": agent, "client": client,
             "n_frags": len(fragments), "total_amount": total_deposit,
@@ -700,17 +846,22 @@ class TorchFraudInjector:
 
     # ------------------------------------------------------------------
     def inject(self, step: int):
-        # Traiter les transactions différées en premier (REFUNDs, mule→récepteur Smurfing)
+        # Transactions différées traitées une seule fois par step
         self._flush_pending(step)
 
-        if self.gen.uniform() < self.probas["ato"]:
-            self._run_ato(step)
-        if self.gen.uniform() < self.probas["refund"]:
-            self._run_refund(step)
+        # Boucle d'injection : _n_inject_per_step tirages indépendants par step.
+        # ATO / REFUND / SPLIT_DEP scalent avec n_mules.
+        # FAKE_CRED et SMURFING sont des machines d'états — appelés une seule fois par step.
+        for _ in range(self._n_inject_per_step):
+            if self.gen.uniform() < self.probas["ato"]:
+                self._run_ato(step)
+            if self.gen.uniform() < self.probas["refund"]:
+                self._run_refund(step)
+            if self.gen.uniform() < self.probas["split_deposit"]:
+                self._run_split_deposit(step)
+        # FAKE_CRED : 1 appel/step — pool de 200 comptes dormants avec activation unique
         allow_new = self.gen.uniform() < self.probas["fake_credentials"]
         self._fake_credentials_step(step, allow_new)
-        if self.gen.uniform() < self.probas["split_deposit"]:
-            self._run_split_deposit(step)
         self._run_smurfing(step)
 
     def get_tracking(self) -> dict:
@@ -747,14 +898,20 @@ class TorchFraudInjector:
 
 if __name__ == "__main__":
     import os
+    from pathlib import Path as _Path
+    _root = _Path(__file__).parent.parent
 
-    params = TorchParameters("./paramFiles", "./fraudScenariosConfig.json", n_clients=2000, seed=1000)
+    params = TorchParameters(
+        str(_root / "config" / "paramFiles"),
+        str(_root / "config" / "fraudScenariosConfig.json"),
+        n_clients=2000, seed=1000)
     engine = TorchMoMTSimEngine(params, n_clients=2000, n_merchants=300, n_banks=20,
                                  n_mules=60, max_slots_per_step=6, seed=1000)
 
     fraud_probas = None
-    if os.path.exists("./calibrated_probas.json"):
-        with open("./calibrated_probas.json", "r", encoding="utf-8") as f:
+    _probas_path = str(_root / "config" / "calibrated_probas.json")
+    if os.path.exists(_probas_path):
+        with open(_probas_path, "r", encoding="utf-8") as f:
             fraud_probas = json.load(f)
 
     injector = TorchFraudInjector(engine, params, fraud_probas=fraud_probas, seed=1000)
@@ -780,7 +937,8 @@ if __name__ == "__main__":
                   f"({sum(engine.log_is_fraud)} frauduleuses)", flush=True)
 
     df = engine.to_dataframe()
-    df.to_csv("rawLog_torch.csv", index=False)
+    _raw_out = str(_root / "config" / "rawLog_torch.parquet")
+    df.to_parquet(_raw_out, index=False)
     fraud_rate = df["isFraud"].mean()
     print(f"\nTerminé — {len(df)} transactions, device={DEVICE}")
     print(f"Taux de fraude global : {fraud_rate:.3f}")

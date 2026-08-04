@@ -11,11 +11,11 @@ export default {
           hover:     "rgb(var(--bg-hover-rgb)      / <alpha-value>)",
         },
         accent: {
-          blue:   "#3B82F6",
-          fraud:  "#EF4444",
-          green:  "#22C55E",
-          amber:  "#F59E0B",
-          purple: "#A78BFA",
+          blue:   "#2563EB",
+          fraud:  "#DC2626",
+          green:  "#16A34A",
+          amber:  "#D97706",
+          purple: "#7C3AED",
         },
         text: {
           primary: "rgb(var(--text-primary-rgb) / <alpha-value>)",
@@ -28,11 +28,11 @@ export default {
           focus:   "rgb(var(--border-focus-rgb) / <alpha-value>)",
         },
         status: {
-          success: "#22C55E",
-          warning: "#F59E0B",
-          danger:  "#EF4444",
-          info:    "#3B82F6",
-          muted:   "#4E5A72",
+          success: "#16A34A",
+          warning: "#D97706",
+          danger:  "#DC2626",
+          info:    "#2563EB",
+          muted:   "#94A3B8",
         },
       },
       fontFamily: {
@@ -43,12 +43,12 @@ export default {
         "2xs": ["0.65rem", { lineHeight: "1rem" }],
       },
       borderRadius: {
-        card: "0.75rem",
+        card: "0",
       },
       boxShadow: {
-        card: "0 1px 3px 0 rgb(0 0 0 / 0.4), 0 1px 2px -1px rgb(0 0 0 / 0.4)",
-        "card-hover": "0 4px 12px 0 rgb(0 0 0 / 0.5)",
-        "focus-ring": "0 0 0 2px #3B82F6",
+        card:        "0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.05)",
+        "card-hover":"0 4px 12px 0 rgb(0 0 0 / 0.10)",
+        "focus-ring":"0 0 0 2px #2563EB",
       },
       keyframes: {
         "fade-in": {

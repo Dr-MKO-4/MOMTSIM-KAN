@@ -25,7 +25,7 @@ function DataTable({ data, fraudColIndex, onPageChange, loading = false }: Props
         </p>
         <div className="flex items-center gap-2">
           <button
-            className="btn-ghost p-1.5 rounded"
+            className="btn-ghost p-1.5"
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1 || loading}
             aria-label="Page précédente"
@@ -36,7 +36,7 @@ function DataTable({ data, fraudColIndex, onPageChange, loading = false }: Props
             {page} / {total_pages}
           </span>
           <button
-            className="btn-ghost p-1.5 rounded"
+            className="btn-ghost p-1.5"
             onClick={() => onPageChange(page + 1)}
             disabled={page >= total_pages || loading}
             aria-label="Page suivante"

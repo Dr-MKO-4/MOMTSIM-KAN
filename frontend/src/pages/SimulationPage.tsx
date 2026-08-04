@@ -1,12 +1,14 @@
-import { useCallback, useState } from "react";
-import { Play, TrendingUp, Activity, Clock } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Play, TrendingUp, Activity, Clock, RotateCcw, Save, CheckCircle2 } from "lucide-react";
 import Layout from "../components/Layout";
 import JobTracker from "../components/JobTracker";
 import PlotlyEmbed from "../components/PlotlyEmbed";
 import StatCard from "../components/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import FormField from "../components/ui/FormField";
-import { startSimulation } from "../api/client";
+import { startSimulation, getSimConfig, saveSimConfig, cancelAllJobs } from "../api/client";
+import { useAppState } from "../contexts/AppContext";
 import type { SimulationParams, SimulationResult } from "../types/api";
 
 const DEFAULTS: SimulationParams = {
@@ -29,36 +31,74 @@ const SCENARIO_COLORS: Record<string, string> = {
 };
 
 export default function SimulationPage() {
-  const [params, setParams]   = useState<SimulationParams>(DEFAULTS);
-  const [jobId, setJobId]     = useState<string | null>(null);
-  const [result, setResult]   = useState<SimulationResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const location = useLocation();
+  const preloaded = (location.state as { params?: SimulationParams } | null)?.params;
 
-  const set = useCallback((name: string, value: number) =>
-    setParams((p) => ({ ...p, [name]: value })), []);
+  const { simJobId, simResult, setSimJobId, setSimResult } = useAppState();
+
+  const [params, setParams]   = useState<SimulationParams>(() => preloaded ? { ...preloaded, fraud_probas: null } : DEFAULTS);
+  const [fromHistory]         = useState<boolean>(!!preloaded);
+  const [loading, setLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [saved, setSaved]     = useState(false);
+
+  // Chargement de la config sauvegardée au montage (sauf si on vient de l'historique)
+  useEffect(() => {
+    if (!preloaded) {
+      getSimConfig()
+        .then((cfg) => setParams((p) => ({ ...p, ...cfg, fraud_probas: null })))
+        .catch(() => {});
+    }
+  }, [preloaded]);
+
+  const set = useCallback((name: string, value: number) => {
+    setSaved(false);
+    setParams((p) => ({ ...p, [name]: value }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    try {
+      await saveSimConfig(params);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { /* ignore */ }
+  }, [params]);
 
   const launch = useCallback(async () => {
     setLoading(true);
-    setResult(null);
+    setHasError(false);
+    setSimResult(null);
     try {
       const { job_id } = await startSimulation(params);
-      setJobId(job_id);
+      setSimJobId(job_id);
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [params, setSimJobId, setSimResult]);
 
   const onDone = useCallback((r: Record<string, unknown>) => {
-    setResult(r as unknown as SimulationResult);
-  }, []);
+    setSimResult(r as unknown as SimulationResult);
+  }, [setSimResult]);
 
-  const canLaunch = !loading && !(jobId !== null && result === null);
+  const onError = useCallback(() => setHasError(true), []);
+
+  const jobId  = simJobId;
+  const result = simResult;
+
+  const canLaunch = !loading && (jobId === null || result !== null || hasError);
 
   return (
     <Layout
       title="Simulation MoMTSim"
-      subtitle="Génération du rawLog_torch.csv — section 3.1 du mémoire"
+      subtitle="Génération du rawLog_torch.parquet — section 3.1 du mémoire"
     >
+      {fromHistory && (
+        <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-blue/10 border border-accent-blue/25 text-xs text-accent-blue">
+          <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+          Paramètres rechargés depuis l'historique — modifiez n_steps pour prolonger la simulation, puis relancez.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* ── Config panel ──────────────────────────────────────────── */}
         <div className="xl:col-span-1 space-y-4">
@@ -66,12 +106,12 @@ export default function SimulationPage() {
             <h2 className="section-title mb-0.5">Paramètres</h2>
             <p className="text-xs text-text-muted mb-4">Population &amp; horizon temporel</p>
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Clients"       name="n_clients"   value={params.n_clients}   onChange={set} min={100}  max={10000} />
+              <FormField label="Clients"       name="n_clients"   value={params.n_clients}   onChange={set} min={100} />
               <FormField label="Marchands"     name="n_merchants" value={params.n_merchants} onChange={set} min={10} />
               <FormField label="Banques"       name="n_banks"     value={params.n_banks}     onChange={set} min={1} />
               <FormField label="Mules"         name="n_mules"     value={params.n_mules}     onChange={set} min={0} />
-              <FormField label="Steps (h)"     name="n_steps"     value={params.n_steps}     onChange={set} min={24} max={8760} hint="720 = 30 jours" />
-              <FormField label="Max slots"     name="max_slots"   value={params.max_slots}   onChange={set} min={1}  max={20} />
+              <FormField label="Steps (h)"     name="n_steps"     value={params.n_steps}     onChange={set} min={24} max={8760} hint="720=30j · 1080=45j · 1440=60j" />
+              <FormField label="Max slots"     name="max_slots"   value={params.max_slots}   onChange={set} min={1}  max={200} hint="tx/client/h" />
               <div className="col-span-2">
                 <FormField label="Seed aléatoire" name="seed" value={params.seed} onChange={set} min={0} />
               </div>
@@ -85,28 +125,54 @@ export default function SimulationPage() {
             </p>
             <p>720 steps = 30 jours (1 step = 1h)</p>
             <p>Probas chargées depuis calibrated_probas.json</p>
+            <p className="pt-1 border-t border-border-subtle mt-1 text-text-muted">Float agent (§3.2.4)</p>
+            <p>Petit agent : 100k–500k FCFA · 60 %</p>
+            <p>Agent moyen : 500k–2M FCFA · 30 %</p>
+            <p>Grand agent : 2M–10M FCFA · 10 %</p>
           </div>
 
-          <button
-            className="btn-primary w-full"
-            onClick={launch}
-            disabled={!canLaunch}
-            aria-busy={loading}
-          >
-            {loading ? (
-              <>
-                <Activity className="w-4 h-4 animate-spin-slow" aria-hidden="true" />
-                Lancement…
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4" aria-hidden="true" />
-                Lancer la simulation
-              </>
-            )}
-          </button>
+          <div className="flex gap-2">
+            <button
+              className="btn-primary flex-1"
+              onClick={launch}
+              disabled={!canLaunch}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <>
+                  <Activity className="w-4 h-4 animate-spin-slow" aria-hidden="true" />
+                  Lancement…
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" aria-hidden="true" />
+                  Lancer
+                </>
+              )}
+            </button>
+            <button
+              className={[
+                "btn-secondary flex items-center gap-1.5 px-3",
+                saved ? "text-accent-green border-accent-green/30" : "",
+              ].join(" ")}
+              onClick={handleSave}
+              title="Sauvegarder la configuration dans sim_config.json"
+              aria-label="Sauvegarder la configuration"
+            >
+              {saved
+                ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                : <Save className="w-4 h-4" aria-hidden="true" />
+              }
+            </button>
+          </div>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={() => {}} />
+          <JobTracker
+            jobId={jobId}
+            onDone={onDone}
+            onError={onError}
+            onStop={() => { cancelAllJobs().catch(() => {}); }}
+            onRestart={launch}
+          />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}

@@ -32,6 +32,11 @@ export const getProbas = () => request<Record<string, number>>("/probas");
 // --- Jobs ---
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 export const listJobs = () => request<Job[]>("/jobs");
+export const cancelJob = (id: string) =>
+  request<{ cancelled: boolean; job_id: string }>(`/jobs/${id}/cancel`, { method: "POST" });
+
+export const cancelAllJobs = () =>
+  request<{ cancelled: string[] }>("/jobs/cancel-all", { method: "POST" });
 
 // --- Pipeline ---
 export const startSimulation = (params: SimulationParams) =>
@@ -45,6 +50,16 @@ export const startKANValidation = () =>
 
 export const startCalibration = (params: CalibrationParams) =>
   request<{ job_id: string }>("/calibrate", { method: "POST", body: JSON.stringify(params) });
+
+// --- Sim config ---
+export const getSimConfig  = () => request<Partial<SimulationParams>>("/sim-config");
+export const saveSimConfig = (params: SimulationParams) =>
+  request<{ saved: string }>("/sim-config", { method: "PUT", body: JSON.stringify(params) });
+
+// --- Calib config ---
+export const getCalibConfig  = () => request<Partial<CalibrationParams>>("/calib-config");
+export const saveCalibConfig = (params: CalibrationParams) =>
+  request<{ saved: string }>("/calib-config", { method: "PUT", body: JSON.stringify(params) });
 
 // --- Health ---
 export const getHealth = () => request<HealthStatus>("/health");
@@ -69,6 +84,9 @@ export const getRun = (runId: string) => request<RunDetail>(`/runs/${runId}`);
 
 export const deleteRun = (runId: string) =>
   request<{ deleted: string }>(`/runs/${runId}`, { method: "DELETE" });
+
+export const getRunParams = (runId: string) =>
+  request<SimulationParams>(`/runs/${runId}/params`);
 
 // --- Polling helper ---
 export function pollJob(

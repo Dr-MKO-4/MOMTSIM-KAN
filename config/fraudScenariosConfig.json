@@ -1,0 +1,57 @@
+{
+  "global": {
+    "fraud_target_min": 0.20,
+    "fraud_target_max": 0.26,
+    "scenarios_equal_share": true
+  },
+  "ato": {
+    "B_min": 5000,
+    "n_min": 2,
+    "n_max": 8,
+    "frag_min": 0.4,
+    "frag_max": 0.9,
+    "lambda_ato": 2
+  },
+  "refund": {
+    "p_refund_threshold": 0.15,
+    "delay_min_hours": 1,
+    "delay_max_hours": 24,
+    "k_max": 3,
+    "ratio_legit": 0.6
+  },
+  "fake_credentials": {
+    "dormance_min_days": 7,
+    "dormance_max_days": 21,
+    "n_leg_min": 3,
+    "n_leg_max": 8,
+    "m_leg_max": 2500,
+    "m_exp_ratio_min": 0.5
+  },
+  "split_deposit": {
+    "epsilon_max": 5000,
+    "T_split_min_sec": 120,
+    "T_split_max_sec": 600,
+    "tariff_grid": [
+      { "threshold": 0,      "commission": 0    },
+      { "threshold": 1000,   "commission": 50   },
+      { "threshold": 5000,   "commission": 150  },
+      { "threshold": 20000,  "commission": 400  },
+      { "threshold": 50000,  "commission": 750  },
+      { "threshold": 100000, "commission": 1200 }
+    ]
+  },
+  "smurfing": {
+    "n_mules_min": 3,
+    "n_mules_max": 8,
+    "pct_conscious": 0.3,
+    "pct_unconscious": 0.4,
+    "S_seuil": 500000,
+    "delta_min": 0.02,
+    "delta_max": 0.05,
+    "delay_mule_min_hours": 1,
+    "delay_mule_max_hours": 12,
+    "operation_interval_days": 10,
+    "n_leg_mule_min": 5,
+    "n_leg_mule_max": 20
+  }
+}

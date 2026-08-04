@@ -2,10 +2,19 @@
 MoMTSim_old/
 
 # ── Données générées (trop lourdes / reproductibles) ─────────────────────────
-rawLog_torch.csv
-featuresLog.csv
-viz_*.html
+rawLog_torch.parquet
+featuresLog.parquet
 config_backups/
+
+# ── Chunks simulation (fichiers parquet fragmentés) ───────────────────────────
+config/_raw_chunks/
+**/_raw_chunks/
+
+# ── Parquets dans les runs historiques ────────────────────────────────────────
+config/runs/**/*.parquet
+
+# ── Outputs générés ───────────────────────────────────────────────────────────
+outputs/
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/
@@ -38,6 +47,22 @@ dist-electron/
 # ── Données générées (runs, exports) ─────────────────────────────────────────
 runs/
 fraudsters.csv
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+
+# ── Config générée (calibration, outputs) ────────────────────────────────────
+config/calibrated_probas.json
+config/fraudsters.csv
+config/rawLog_torch.parquet
+config/featuresLog.parquet
+config/test_cases.json
+
+# ── Notebooks ────────────────────────────────────────────────────────────────
+notebooks/.ipynb_checkpoints/
+
+# ── src cache ─────────────────────────────────────────────────────────────────
+src/__pycache__/
 
 # ── OS ───────────────────────────────────────────────────────────────────────
 .DS_Store

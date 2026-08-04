@@ -135,7 +135,7 @@ class FeatureEngineer:
             on="nameOrig", how="left", suffixes=("", "_mule"))
         df["delta_commission_ratio"] = df["delta_commission_ratio_mule"].combine_first(
             df["delta_commission_ratio"])
-        df["is_mule_candidate"] = df["is_mule_candidate_mule"].fillna(False)
+        df["is_mule_candidate"] = df["is_mule_candidate_mule"].fillna(False).astype(bool)
         df = df.drop(columns=[c for c in df.columns if c.endswith("_mule")])
         return df
 
@@ -273,10 +273,13 @@ class FeatureEngineer:
 
 
 if __name__ == "__main__":
-    df_raw = pd.read_csv("rawLog_torch.csv")
+    from pathlib import Path as _Path
+    _root = _Path(__file__).parent.parent
+
+    df_raw = pd.read_parquet(str(_root / "config" / "rawLog_torch.parquet"))
     engineer = FeatureEngineer(df_raw)
     df_features = engineer.compute_all()
-    df_features.to_csv("featuresLog.csv", index=False)
+    df_features.to_parquet(str(_root / "config" / "featuresLog.parquet"), index=False)
 
     print(df_features[["step", "action", "amount", "r1", "r2", "flag_anomalie",
                         "flag_nuit", "v1h", "delta_commission_ratio",

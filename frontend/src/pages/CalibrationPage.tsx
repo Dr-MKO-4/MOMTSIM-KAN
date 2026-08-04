@@ -1,23 +1,25 @@
-import { useCallback, useState } from "react";
-import { BarChart3, Activity, TrendingDown, CheckCircle2, XCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Activity, TrendingDown, CheckCircle2, XCircle, Save } from "lucide-react";
 import Layout from "../components/Layout";
 import JobTracker from "../components/JobTracker";
 import StatCard from "../components/StatCard";
 import EmptyState from "../components/ui/EmptyState";
 import FormField from "../components/ui/FormField";
-import { startCalibration } from "../api/client";
+import { startCalibration, getCalibConfig, saveCalibConfig, cancelAllJobs } from "../api/client";
+import { useAppState } from "../contexts/AppContext";
 import type { CalibrationParams, CalibrationResult } from "../types/api";
 
 const DEFAULTS: CalibrationParams = {
   n_clients:       500,
   n_merchants:     100,
   n_banks:         10,
-  n_mules:         30,
+  n_mules:         300,
+  max_slots:       50,
   target_mid:      0.23,
   n_steps:         720,
   n_bins:          30,
   n_seeds_per_eval: 3,
-  maxiter:         25,
+  maxiter:         30,
   lr:              0.05,
   spsa_c:          0.02,
 };
@@ -37,30 +39,56 @@ const SCENARIO_BAR_SCALE: Record<string, number> = {
 };
 
 export default function CalibrationPage() {
-  const [params, setParams]   = useState<CalibrationParams>(DEFAULTS);
-  const [jobId, setJobId]     = useState<string | null>(null);
-  const [result, setResult]   = useState<CalibrationResult | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { calibJobId, calibResult, setCalibJobId, setCalibResult } = useAppState();
 
-  const set = useCallback((name: string, value: number) =>
-    setParams((p) => ({ ...p, [name]: value })), []);
+  const [params, setParams]   = useState<CalibrationParams>(DEFAULTS);
+  const [loading, setLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [saved, setSaved]     = useState(false);
+
+  const jobId  = calibJobId;
+  const result = calibResult;
+
+  // Chargement de la config sauvegardée au montage
+  // n_mules et max_slots viennent automatiquement de sim_config.json (via le backend)
+  useEffect(() => {
+    getCalibConfig()
+      .then((cfg) => setParams((p) => ({ ...p, ...cfg })))
+      .catch(() => {});
+  }, []);
+
+  const set = useCallback((name: string, value: number) => {
+    setSaved(false);
+    setParams((p) => ({ ...p, [name]: value }));
+  }, []);
+
+  const handleSave = useCallback(async () => {
+    try {
+      await saveCalibConfig(params);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch { /* ignore */ }
+  }, [params]);
 
   const launch = useCallback(async () => {
     setLoading(true);
-    setResult(null);
+    setHasError(false);
+    setCalibResult(null);
     try {
       const { job_id } = await startCalibration(params);
-      setJobId(job_id);
+      setCalibJobId(job_id);
     } finally {
       setLoading(false);
     }
-  }, [params]);
+  }, [params, setCalibJobId, setCalibResult]);
 
   const onDone = useCallback((r: Record<string, unknown>) => {
-    setResult(r as unknown as CalibrationResult);
-  }, []);
+    setCalibResult(r as unknown as CalibrationResult);
+  }, [setCalibResult]);
 
-  const canLaunch = !loading && !(jobId !== null && result === null);
+  const onError = useCallback(() => setHasError(true), []);
+
+  const canLaunch = !loading && (jobId === null || result !== null || hasError);
   const totalRuns  = params.maxiter * 2 * params.n_seeds_per_eval;
 
   return (
@@ -78,7 +106,8 @@ export default function CalibrationPage() {
               <FormField label="Clients"       name="n_clients"        value={params.n_clients}        onChange={set} min={50} />
               <FormField label="Marchands"     name="n_merchants"      value={params.n_merchants}      onChange={set} min={10} />
               <FormField label="Banques"       name="n_banks"          value={params.n_banks}          onChange={set} min={1} />
-              <FormField label="Mules"         name="n_mules"          value={params.n_mules}          onChange={set} min={0} />
+              <FormField label="Mules"         name="n_mules"          value={params.n_mules}          onChange={set} min={0} hint="← depuis sim_config.json" />
+              <FormField label="Max slots"     name="max_slots"        value={params.max_slots}        onChange={set} min={1} hint="← depuis sim_config.json" />
               <FormField label="target_mid"    name="target_mid"       value={params.target_mid}       onChange={set} min={0.1} max={0.5} isFloat hint="Taux de fraude cible" />
               <FormField label="n_steps"       name="n_steps"          value={params.n_steps}          onChange={set} min={24} />
               <FormField label="n_bins"        name="n_bins"           value={params.n_bins}           onChange={set} min={5} />
@@ -92,37 +121,64 @@ export default function CalibrationPage() {
           </div>
 
           {/* Formula memo */}
-          <div className="card-sm text-xs font-mono">
-            <p className="text-2xs text-text-muted uppercase tracking-widest mb-2 font-sans font-medium">Formule d'optimisation</p>
-            <p className="text-text-muted leading-relaxed">θ* = argmin_θ Σ_c Σ_t (Dr − Ds)²</p>
-            <p className="text-text-dim mt-2">2 évaluations / iter (SPSA)</p>
-            <p className="text-text-dim">≈ {totalRuns} runs estimés</p>
+          <div className="card-sm text-xs font-mono space-y-1">
+            <p className="text-2xs text-text-muted uppercase tracking-widest mb-2 font-sans font-medium">Ma contribution — §3.1.4</p>
+            <p className="text-text-muted leading-relaxed">θ* = argmin sse(θ)</p>
+            <p className="text-text-dim">sse = Σ_c Σ_t (Dr − D̄s)²</p>
+            <p className="text-text-dim">c ∈ {"{ATO, REFUND, FAKE_CRED,"}</p>
+            <p className="text-text-dim pl-4">{"SPLIT_DEP, SMURFING}"}</p>
+            <p className="text-text-dim mt-1">Dr(c,t) = N_lég(t)·r / (1−r)·5</p>
+            <p className="text-text-dim">D̄s = moyenne sur {params.n_seeds_per_eval} seeds</p>
+            <p className="text-text-dim mt-1">SPSA : 2 éval/iter (Spall 1992)</p>
+            <p className="text-accent-blue mt-1">≈ {totalRuns} simulations</p>
           </div>
 
-          <button
-            className="btn-primary w-full"
-            onClick={launch}
-            disabled={!canLaunch}
-            aria-busy={loading}
-          >
-            {loading ? (
-              <>
-                <Activity className="w-4 h-4 animate-spin-slow" aria-hidden="true" />
-                Lancement…
-              </>
-            ) : (
-              <>
-                <BarChart3 className="w-4 h-4" aria-hidden="true" />
-                Calibrer les probabilités
-              </>
-            )}
-          </button>
+          <div className="flex gap-2">
+            <button
+              className="btn-primary flex-1"
+              onClick={launch}
+              disabled={!canLaunch}
+              aria-busy={loading}
+            >
+              {loading ? (
+                <>
+                  <Activity className="w-4 h-4 animate-spin-slow" aria-hidden="true" />
+                  Lancement…
+                </>
+              ) : (
+                <>
+                  <BarChart3 className="w-4 h-4" aria-hidden="true" />
+                  Calibrer
+                </>
+              )}
+            </button>
+            <button
+              className={[
+                "btn-secondary flex items-center gap-1.5 px-3",
+                saved ? "text-accent-green border-accent-green/30" : "",
+              ].join(" ")}
+              onClick={handleSave}
+              title="Sauvegarder la configuration dans calib_config.json"
+              aria-label="Sauvegarder la configuration SPSA"
+            >
+              {saved
+                ? <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                : <Save className="w-4 h-4" aria-hidden="true" />
+              }
+            </button>
+          </div>
 
           <p className="caption text-center">
             Peut prendre plusieurs minutes selon maxiter et n_clients.
           </p>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={() => {}} />
+          <JobTracker
+            jobId={jobId}
+            onDone={onDone}
+            onError={onError}
+            onStop={() => { cancelAllJobs().catch(() => {}); }}
+            onRestart={launch}
+          />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}
@@ -132,11 +188,13 @@ export default function CalibrationPage() {
               {/* KPI */}
               <div className="grid grid-cols-3 gap-3">
                 <StatCard
-                  label="SSE final"
-                  value={result.sse_final.toFixed(1)}
+                  label="SSE normalisé"
+                  value={result.sse_final < 0.01
+                    ? result.sse_final.toExponential(2)
+                    : result.sse_final.toFixed(4)}
                   icon={TrendingDown}
                   color={result.converged ? "green" : "amber"}
-                  description={result.converged ? "Convergé" : "Non convergé"}
+                  description={result.converged ? "< 1.0 ✓" : "≥ 1.0"}
                 />
                 <StatCard
                   label="Itérations"

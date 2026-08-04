@@ -84,6 +84,7 @@ export interface CalibrationParams {
   n_merchants: number;
   n_banks: number;
   n_mules: number;
+  max_slots: number;
   target_mid: number;
   n_steps: number;
   n_bins: number;
@@ -109,7 +110,7 @@ export interface SimulationResult {
   fraud_rate: number;
   fraud_by_scenario: Record<string, number>;
   steps_run: number;
-  csv_path: string;
+  parquet_path: string;
   plain_summary?: string;
   charts: Record<string, string>;
 }
@@ -118,7 +119,7 @@ export interface FeatureResult {
   n_rows: number;
   n_features: number;
   feature_names: string[];
-  csv_path: string;
+  parquet_path: string;
   charts: Record<string, string>;
 }
 
@@ -175,6 +176,7 @@ export interface RunSummary {
   sse_final?: number;
   converged?: boolean;
   plain_summary?: string;
+  sim_params?: SimulationParams;
 }
 
 export interface RunEntry {

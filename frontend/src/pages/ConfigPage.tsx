@@ -227,7 +227,7 @@ export default function ConfigPage() {
                 aria-controls={`tab-panel-${t.key}`}
                 onClick={() => setActiveTab(t.key)}
                 className={[
-                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer",
+                  "px-3 py-1.5 text-xs font-medium transition-colors duration-150 cursor-pointer",
                   activeTab === t.key
                     ? "bg-accent-blue text-white"
                     : "bg-bg-card text-text-muted hover:text-text-primary border border-border hover:border-border-hover",

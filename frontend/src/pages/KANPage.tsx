@@ -59,9 +59,11 @@ export default function KANPage() {
   const [jobId, setJobId]     = useState<string | null>(null);
   const [result, setResult]   = useState<KANValidationResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const launch = useCallback(async () => {
     setLoading(true);
+    setHasError(false);
     setResult(null);
     try {
       const { job_id } = await startKANValidation();
@@ -75,7 +77,9 @@ export default function KANPage() {
     setResult(r as unknown as KANValidationResult);
   }, []);
 
-  const canLaunch = !loading && !(jobId !== null && result === null);
+  const onError = useCallback(() => setHasError(true), []);
+
+  const canLaunch = !loading && (jobId === null || result !== null || hasError);
 
   return (
     <Layout
@@ -152,7 +156,7 @@ export default function KANPage() {
             Requiert featuresLog.csv (feature engineering préalable)
           </p>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={() => {}} />
+          <JobTracker jobId={jobId} onDone={onDone} onError={onError} />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}

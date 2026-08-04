@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, Clock, Square, RotateCcw } from "lucide-react";
 import { pollJob } from "../api/client";
 import type { Job } from "../types/api";
 
@@ -7,6 +7,8 @@ interface Props {
   jobId: string | null;
   onDone?: (result: Record<string, unknown>) => void;
   onError?: (err: string) => void;
+  onStop?: () => void;
+  onRestart?: () => void;
 }
 
 const STATUS_CONFIG = {
@@ -47,7 +49,7 @@ function formatElapsed(seconds: number): string {
   return `${m}m ${s < 10 ? "0" : ""}${s}s`;
 }
 
-export default function JobTracker({ jobId, onDone, onError }: Props) {
+export default function JobTracker({ jobId, onDone, onError, onStop, onRestart }: Props) {
   const [job, setJob] = useState<Job | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const stopRef  = useRef<(() => void) | null>(null);
@@ -79,7 +81,17 @@ export default function JobTracker({ jobId, onDone, onError }: Props) {
     return () => clearInterval(id);
   }, [job?.status]);
 
-  if (!job) return null;
+  if (!job) {
+    if (!jobId) return null;
+    return (
+      <div className="card mt-4 animate-fade-in">
+        <div className="flex items-center gap-2">
+          <Loader2 className="w-4 h-4 text-text-dim animate-spin-slow" aria-hidden="true" />
+          <span className="text-xs text-text-dim font-mono">Reconnexion…</span>
+        </div>
+      </div>
+    );
+  }
 
   const cfg = STATUS_CONFIG[job.status];
   const StatusIcon = cfg.icon;
@@ -110,6 +122,26 @@ export default function JobTracker({ jobId, onDone, onError }: Props) {
           >
             {job.progress}%
           </span>
+          {isRunning && onStop && (
+            <button
+              className="p-1 text-text-dim hover:text-accent-fraud transition-colors duration-150"
+              onClick={() => onStop()}
+              title="Arrêter le job"
+              aria-label="Arrêter"
+            >
+              <Square className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
+          {!isRunning && onRestart && (
+            <button
+              className="p-1 text-text-dim hover:text-accent-blue transition-colors duration-150"
+              onClick={onRestart}
+              title="Relancer"
+              aria-label="Relancer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            </button>
+          )}
         </div>
       </div>
 
