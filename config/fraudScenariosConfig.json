@@ -8,20 +8,20 @@
     "B_min": 5000,
     "n_min": 2,
     "n_max": 8,
-    "frag_min": 0.4,
-    "frag_max": 0.9,
+    "frag_min": 0.15,
+    "frag_max": 0.35,
     "lambda_ato": 2
   },
   "refund": {
     "p_refund_threshold": 0.15,
     "delay_min_hours": 1,
-    "delay_max_hours": 24,
+    "delay_max_hours": 48,
     "k_max": 3,
-    "ratio_legit": 0.6
+    "ratio_legit": 0.3
   },
   "fake_credentials": {
     "dormance_min_days": 7,
-    "dormance_max_days": 21,
+    "dormance_max_days": 30,
     "n_leg_min": 3,
     "n_leg_max": 8,
     "m_leg_max": 2500,
@@ -29,8 +29,8 @@
   },
   "split_deposit": {
     "epsilon_max": 5000,
-    "T_split_min_sec": 120,
-    "T_split_max_sec": 600,
+    "T_split_min_sec": 60,
+    "T_split_max_sec": 120,
     "tariff_grid": [
       { "threshold": 0,      "commission": 0    },
       { "threshold": 1000,   "commission": 50   },

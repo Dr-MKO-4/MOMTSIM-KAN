@@ -975,8 +975,58 @@ où $\alpha = 0{,}05$ est le pas d'apprentissage et $\Pi_\Theta$ est la projecti
 La meilleure configuration rencontrée, $\theta^* = \arg\min_{k \leq K_\text{max}} \text{sse}(\theta_k)$, est retenue et sauvegardée dans \texttt{calibrated\_probas.json} pour utilisation dans les simulations de production.
 
 \section{Correspondance entre taxonomie de fraude et scénarios simulables}
+\label{sec:scenarios}
 
-MoMTSim est un environnement de simulation multi-agents dont l'architecture repose sur la définition de profils comportementaux pour chaque type d'agent : client légitime, client fraudeur, marchand, agent distributeur, banque. L'injection d'un scénario de fraude dans MoMTSim consiste à définir un profil d'agent fraudeur spécifique, à paramétrer ses règles de décision transactionnelle, et à le déployer dans l'environnement aux côtés des agents légitimes. Cette section détaille la configuration technique des cinq scénarios retenus.
+MoMTSim est un environnement de simulation multi-agents dont l'architecture repose sur la définition de profils comportementaux pour chaque type d'agent : client légitime, client fraudeur, marchand, agent distributeur, banque. L'injection d'un scénario de fraude dans MoMTSim consiste à définir un profil d'agent fraudeur spécifique, à paramétrer ses règles de décision transactionnelle, et à le déployer dans l'environnement aux côtés des agents légitimes. Cette section détaille la configuration technique des cinq scénarios retenus. Le tableau~\ref{tab:scenarios_momtsim} en offre une vue synoptique avant le détail de chaque configuration.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Configuration des cinq scénarios de fraude injectés dans MoMTSim}
+\label{tab:scenarios_momtsim}
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{@{}
+  p{2.2cm}
+  p{2.8cm}
+  p{2.5cm}
+  p{1.8cm}
+  p{4.0cm}
+@{}}
+\toprule
+\multicolumn{1}{c}{\textbf{Scénario}}
+  & \multicolumn{1}{c}{\textbf{Type d'agent fraudeur}}
+  & \multicolumn{1}{c}{\textbf{Transactions générées}}
+  & \multicolumn{1}{c}{\textbf{Fenêtre temporelle}}
+  & \multicolumn{1}{c}{\textbf{Feature discriminante principale}} \\
+\midrule
+ATO
+  & Client compromis
+  & TRANSFER /\newline CASH-OUT
+  & $<10$~min
+  & Vélocité, nouveauté du destinataire \\[4pt]
+Refund Fraud
+  & Client abusif
+  & PAYMENT +\newline REFUND
+  & 1h -- 48h
+  & Ratio REFUND\,/\,PAYMENT \\[4pt]
+Fake Credentials
+  & Client identité hybride
+  & CASH-IN +\newline TRANSFER
+  & 7 -- 30 jours
+  & Ancienneté du compte, ratio montant\,/\,historique \\[4pt]
+Split Deposit
+  & Agent distributeur
+  & CASH-IN multiple
+  & 60 -- 120~sec
+  & Agrégation au niveau du guichet agent \\[4pt]
+Smurfing
+  & Réseau $f_1$ + mules + $f_2$
+  & TRANSFER chaîné
+  & Mensuel
+  & Critères relationnels \citet{zhdanova2014smurfs} \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \subsection{Scénario 1 : Account Takeover, retraits massifs haute vélocité}
 
@@ -1081,57 +1131,7 @@ La configuration technique du graphe de fraud chain comprend :
     \item \textbf{Rotation des sous-réseaux :} à chaque opération mensuelle, $f_1$ sélectionne aléatoirement $k$ mules parmi les $n$ disponibles, garantissant qu'aucun triplet fixe $(f_1, m_i, f_2)$ n'apparaît systématiquement dans les données, conformément au mécanisme d'adaptation adversariale documenté au Chapitre~1.
 \end{itemize}
 
-Ce scénario génère dans le jeu de données des transactions individuelles étiquetées frauduleuses qui sont statistiquement indiscernables des transactions légitimes au niveau unitaire, mais qui révèlent leur nature par l'analyse des critères relationnels : existence de paires entrée-sortie vérifiant $a_{rec} - a_{sent} \leq 0{,}10 \cdot a_{rec}$, et convergence de plusieurs de ces paires vers un même récepteur $f_2$ depuis un même émetteur $f_1$.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Configuration des cinq scénarios de fraude injectés dans MoMTSim}
-\label{tab:scenarios_momtsim}
-\renewcommand{\arraystretch}{1.6}
-\begin{tabular}{@{}
-  p{2.2cm}
-  p{2.8cm}
-  p{2.5cm}
-  p{1.8cm}
-  p{4.0cm}
-@{}}
-\toprule
-\multicolumn{1}{c}{\textbf{Scénario}}
-  & \multicolumn{1}{c}{\textbf{Type d'agent fraudeur}}
-  & \multicolumn{1}{c}{\textbf{Transactions générées}}
-  & \multicolumn{1}{c}{\textbf{Fenêtre temporelle}}
-  & \multicolumn{1}{c}{\textbf{Feature discriminante principale}} \\
-\midrule
-ATO
-  & Client compromis
-  & TRANSFER /\newline CASH-OUT
-  & $<10$~min
-  & Vélocité, nouveauté du destinataire \\[4pt]
-Refund Fraud
-  & Client abusif
-  & PAYMENT +\newline REFUND
-  & 1h -- 48h
-  & Ratio REFUND\,/\,PAYMENT \\[4pt]
-Fake Credentials
-  & Client identité hybride
-  & CASH-IN +\newline TRANSFER
-  & 7 -- 30 jours
-  & Ancienneté du compte, ratio montant\,/\,historique \\[4pt]
-Split Deposit
-  & Agent distributeur
-  & CASH-IN multiple
-  & 60 -- 120~sec
-  & Agrégation au niveau du guichet agent \\[4pt]
-Smurfing
-  & Réseau $f_1$ + mules + $f_2$
-  & TRANSFER chaîné
-  & Mensuel
-  & Critères relationnels \citet{zhdanova2014smurfs} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
+Ce scénario génère dans le jeu de données des transactions individuelles étiquetées frauduleuses qui sont statistiquement indiscernables des transactions légitimes au niveau unitaire, mais qui révèlent leur nature par l'analyse des critères relationnels : existence de paires entrée-sortie vérifiant $a_{rec} - a_{sent} \leq 0{,}10 \cdot a_{rec}$, et convergence de plusieurs de ces paires vers un même récepteur $f_2$ depuis un même émetteur $f_1$. 
 \section{Ingénierie des caractéristiques transactionnelles pour le flux haute fréquence}
 
 Les données brutes générées par MoMTSim pour chacun des cinq scénarios configurés en section~3.2 se présentent sous la forme de tuples transactionnels bruts $\langle \text{step},\ \text{type},\ \text{amount},\ \text{oldBalOrig},\ \text{newBalOrig},\ \text{oldBalDest},\ \text{newBalDest},\ \text{isFraud} \rangle$. Ces variables brutes, prises isolément, sont insuffisantes pour permettre une convergence efficace des splines du réseau KAN : les montants absolus varient sur plusieurs ordres de grandeur selon le profil du compte et le type de transaction, rendant les fonctions B-spline difficiles à calibrer sur l'ensemble du domaine. L'ingénierie des caractéristiques consiste à transformer ces variables brutes en features dérivées dont les distributions sont statistiquement plus régulières, sémantiquement plus discriminantes par scénario de fraude, et structurellement alignées avec les propriétés des nœuds multiplicatifs de l'architecture MultKAN.
@@ -1145,63 +1145,63 @@ La première feature dérivée est l'écart entre le solde de l'expéditeur avan
 \begin{equation}
     \Delta B_{orig} = \text{oldBalOrig} - \text{newBalOrig}
 \end{equation}
-Dans un système Mobile Money sans frais variables, cette différence devrait être exactement égale au montant de la transaction $\text{amount}$. Tout écart significatif entre $\Delta B_{orig}$ et $\text{amount}$ constitue un signal d'incohérence comptable détectable, notamment dans le scénario Insider Fraud où un employé crée du flottant fictif sans contrepartie de dépôt réel. Cette feature est calculée directement à partir des variables brutes disponibles dans MoMTSim sans nécessiter d'historique.
+Cette feature est adaptée des variables de contrôle comptable introduites par \citet{lopezrojas2016paysim} dans le simulateur PaySim, premier travail à formaliser $\Delta B_{orig}$ comme signal de détection dans un contexte Mobile Money synthétique. L'adaptation consiste ici à exploiter la propriété de conservation comptable propre au contexte CEMAC : contrairement aux systèmes bancaires classiques où des frais variables peuvent expliquer un écart, les opérateurs Mobile Money en zone CEMAC ne prélèvent pas de commission sur le solde émetteur transaction par transaction, de sorte que l'identité $\Delta B_{orig} = \text{amount}$ est une contrainte stricte vérifiable. Tout écart significatif entre $\Delta B_{orig}$ et $\text{amount}$ constitue un signal d'incohérence comptable détectable, notamment dans le scénario Insider Fraud où un employé crée du flottant fictif sans contrepartie de dépôt réel. Cette feature est calculée directement à partir des variables brutes disponibles dans MoMTSim sans nécessiter d'historique.
 
 \paragraph{Différence de solde du destinataire.}
 Symétriquement, l'écart entre le solde du destinataire avant et après la transaction est :
 \begin{equation}
     \Delta B_{dest} = \text{newBalDest} - \text{oldBalDest}
 \end{equation}
-La comparaison de $\Delta B_{dest}$ avec $\text{amount}$ permet de détecter des incohérences de crédit, notamment dans le scénario Smurfing où la mule ne reçoit qu'une fraction de ce que l'émetteur a envoyé, la différence correspondant à la commission prélevée. Le couple $(\Delta B_{orig}, \Delta B_{dest})$ constitue un vecteur de contrôle de conservation des fonds exploitable nativement par les nœuds multiplicatifs de MultKAN.
+Également inspirée de \citet{lopezrojas2016paysim}, cette feature symétrique est ici adaptée au rôle spécifique du destinataire dans les typologies de fraude CEMAC : alors que PaySim traite $\Delta B_{dest}$ comme un contrôle de cohérence générique, ce travail l'exploite en tant que mesure directe de la commission de mule dans le scénario Smurfing, où la mule ne reçoit qu'une fraction de ce que l'émetteur a envoyé. La comparaison du couple $(\Delta B_{orig},\ \Delta B_{dest})$ avec $\text{amount}$ permet de quantifier simultanément la sortie de fonds chez l'émetteur et l'entrée nette chez le destinataire, révélant toute capture intermédiaire de valeur. Ce couple constitue un vecteur de contrôle de conservation des fonds exploitable nativement par les nœuds multiplicatifs de MultKAN.
 
 \paragraph{Ratio Montant / Ancien solde de l'expéditeur.}
 Le ratio :
 \begin{equation}
     r_1 = \frac{\text{amount}}{\text{oldBalOrig} + \epsilon}
 \end{equation}
-où $\epsilon = 10^{-6}$ est un terme de régularisation évitant la division par zéro, mesure la proportion du solde initial consommée par la transaction. Ce ratio est la feature principale pour la détection de l'ATO : une extraction frénétique caractéristique de ce scénario produit $r_1 \rightarrow 1$ sur chaque transaction de la séquence, tandis qu'une transaction légitime typique produit $r_1 \ll 1$. La distribution de $r_1$ est bornée dans $[0, 1]$, propriété favorable à la calibration des splines B qui opèrent sur un domaine compact.
+où $\epsilon = 10^{-6}$ est un terme de régularisation évitant la division par zéro, est une contribution originale de ce travail. Sa construction repose sur l'observation que le montant absolu d'une transaction est un signal faible en contexte Mobile Money : un retrait de 50\,000 FCFA est anodin pour un compte à 5\,000\,000 FCFA mais constitue un vidage total pour un compte à 50\,000 FCFA. En normalisant le montant par le solde \emph{avant} la transaction, $r_1$ produit une mesure adimensionnelle de la proportion du solde initial consommée, invariante à l'échelle du compte. Ce ratio est la feature principale pour la détection de l'Account Takeover (ATO, cf.\ section~\ref{sec:scenarios}) : une extraction frénétique caractéristique de ce scénario produit $r_1 \rightarrow 1$ sur chaque transaction de la séquence, tandis qu'une transaction légitime typique produit $r_1 \ll 1$. La distribution de $r_1$ est bornée dans $[0, 1]$, propriété favorable à la calibration des splines B qui opèrent sur un domaine compact.
 
 \paragraph{Ratio Montant / Nouveau solde de l'expéditeur.}
 Le ratio complémentaire :
 \begin{equation}
     r_2 = \frac{\text{amount}}{\text{newBalOrig} + \epsilon}
 \end{equation}
-évalue l'impact de la transaction sur le solde résiduel de l'expéditeur. Lorsque $r_2 \gg 1$, la transaction a consommé l'intégralité du solde disponible, voire produit un découvert, signal caractéristique de la phase terminale d'un ATO où le fraudeur vide le compte jusqu'au dernier centime. Le couple $(r_1, r_2)$ est conçu pour alimenter nativement un nœud multiplicatif MultKAN : leur produit $r_1 \cdot r_2$ amplifie le signal de vidage total et produit une règle analytique directement auditable par un superviseur COBAC sous la forme \og la transaction consomme une fraction $r_1$ du solde initial et laisse un solde résiduel tel que $r_2 > \tau$ \fg{}.
+est également une contribution originale de ce travail, complémentaire à $r_1$. Alors que $r_1$ mesure la proportion du solde \emph{avant} la transaction, $r_2$ évalue l'impact sur le solde \emph{résiduel} : lorsque $r_2 \gg 1$, la transaction a consommé l'intégralité du solde disponible, voire produit un découvert, signal caractéristique de la phase terminale d'un ATO où le fraudeur vide le compte jusqu'au dernier centime. Le couple $(r_1, r_2)$ est conçu pour alimenter nativement un nœud multiplicatif MultKAN : leur produit $r_1 \cdot r_2$ amplifie le signal de vidage total et produit une règle analytique directement auditable par un superviseur COBAC sous la forme \og la transaction consomme une fraction $r_1$ du solde initial et laisse un solde résiduel tel que $r_2 > \tau$ \fg{}, où $\tau \in \mathbb{R}_+$ est un seuil de décision fixé par validation croisée (typiquement $\tau = 1$, signalant que le montant transféré excède le solde résiduel post-transaction).
 
 \paragraph{Indicateur de transaction anormalement grande.}
 La variable binaire :
 \begin{equation}
     \text{Flag}_{anomalie} = \mathbf{1}\left[\text{amount} > \mu_{\text{amount}} + 2\sigma_{\text{amount}}\right]
 \end{equation}
-où $\mu_{\text{amount}}$ et $\sigma_{\text{amount}}$ sont la moyenne et l'écart-type des montants calculés sur les transactions du même type dans la fenêtre glissante des 10 dernières opérations du compte, marque les transactions dont le montant dépasse statistiquement le comportement habituel du compte. Cette feature est transversale à plusieurs scénarios : elle est activée par la transaction d'exfiltration finale d'un Fake Credentials, par les montants anormalement élevés d'un ATO sur un compte habituellement peu actif, et par les transactions de la phase active du smurfing lorsque le montant total $X$ à blanchir est élevé relativement aux habitudes du compte émetteur.
+où $\mu_{\text{amount}}$ et $\sigma_{\text{amount}}$ sont la moyenne et l'écart-type des montants calculés sur les transactions du même type dans la fenêtre glissante des 10 dernières opérations du compte, applique le critère classique de détection d'outlier à $2\sigma$ \citep{bolton2002statistical} à l'analyse comportementale par compte. L'adaptation par rapport à l'usage standard en détection de fraude bancaire \citep{bolton2002statistical} consiste à calculer $\mu_{\text{amount}}$ et $\sigma_{\text{amount}}$ sur une fenêtre glissante \emph{par compte et par type de transaction} plutôt que sur la population globale : cette individualisation du seuil tient compte du profil transactionnel propre à chaque utilisateur Mobile Money, dont les habitudes de montant sont très hétérogènes dans le contexte CEMAC. Cette feature est transversale à plusieurs scénarios : elle est activée par la transaction d'exfiltration finale d'un Fake Credentials, par les montants anormalement élevés d'un ATO sur un compte habituellement peu actif, et par les transactions de la phase active du smurfing lorsque le montant total $X$ à blanchir est élevé relativement aux habitudes du compte émetteur.
 
 \paragraph{Écart de commission de la mule (Smurfing).}
 Pour la détection du smurfing, la feature centrale est l'écart entre le montant reçu et le montant retransféré par un même compte sur une fenêtre courte :
 \begin{equation}
     \delta_{commission} = a_{rec} - a_{sent}
 \end{equation}
-avec la contrainte de qualification $0 < \delta_{commission} \leq 0{,}10 \cdot a_{rec}$, correspondant au Critère~1 de \citet{zhdanova2014smurfs} formalisé au Chapitre~1. Cette feature est calculée en appariant, pour chaque compte, la transaction \textsc{Transfer} entrante la plus récente avec la transaction \textsc{Transfer} sortante la plus proche temporellement. Un compte présentant systématiquement $\delta_{commission}$ dans l'intervalle $]0,\ 0{,}10 \cdot a_{rec}]$ est identifié comme mule candidate. La normalisation $\delta_{commission} / a_{rec}$ produit une variable bornée dans $[0,\ 0{,}10]$ dont la distribution régulière est favorable à l'approximation par splines.
+avec la contrainte de qualification $0 < \delta_{commission} \leq 0{,}10 \cdot a_{rec}$, correspondant au Critère~1 de \citet{zhdanova2014smurfs} formalisé au Chapitre~1. Le seuil de $10\%$ est retenu tel quel depuis \citet{zhdanova2014smurfs}, dont l'étude empirique sur les réseaux de mules bancaires européens établit que la commission de mule excède rarement $10\%$ du montant transféré, au-delà duquel le différentiel devient trop visible pour échapper aux contrôles de premier niveau. Cette valeur est conservée sans modification car les entretiens documentés au Chapitre~1 sur le contexte camerounais confirment une structure de commission analogue pour le Mobile Money. Cette feature est calculée en appariant, pour chaque compte, la transaction \textsc{Transfer} entrante la plus récente avec la transaction \textsc{Transfer} sortante la plus proche temporellement. Un compte présentant systématiquement $\delta_{commission}$ dans l'intervalle $]0,\ 0{,}10 \cdot a_{rec}]$ est identifié comme mule candidate. La normalisation $\delta_{commission} / a_{rec}$ produit une variable bornée dans $[0,\ 0{,}10]$ dont la distribution régulière est favorable à l'approximation par splines.
 
 \paragraph{Variance des montants sur fenêtre agent (Split Deposit).}
 Pour la détection du Split Deposit, la feature discriminante est la variance des montants des transactions \textsc{Cash-In} effectuées par le même agent distributeur sur une fenêtre de 2 minutes :
 \begin{equation}
     \text{Var}_{agent}(m_j) = \frac{1}{k}\sum_{j=1}^{k}\left(m_j - \bar{m}\right)^2, \qquad \bar{m} = \frac{1}{k}\sum_{j=1}^{k} m_j
 \end{equation}
-Une variance faible couplée à un nombre $k \geq 2$ de transactions \textsc{Cash-In} vers le même compte destinataire sur la fenêtre de 2 minutes constitue la signature caractéristique du Split Deposit : les fragments sont délibérément proches pour paraître naturels tout en restant distincts pour éviter les filtres de détection de doublons. Cette feature est calculée au niveau du guichet agent, et non au niveau du compte client.
+Cette feature est une contribution originale de ce travail, motivée par la logique frauduleuse du Split Deposit : le fraudeur découpe un dépôt unique en $k$ fragments proches pour rester sous les seuils de déclaration, ce qui produit une distribution de montants quasi-constante — et donc une variance quasi-nulle — sur la fenêtre d'observation. La variance est délibérément calculée au niveau du \emph{guichet agent}, et non du compte client, car c'est l'agent qui orchestre le découpage : un même client pourrait légitimement effectuer plusieurs dépôts de même montant dans des agences différentes, mais un même agent réalisant plusieurs \textsc{Cash-In} de montant quasi-identique vers un même destinataire sur 2 minutes est un signal univoque. Une variance faible $(\text{Var}_{agent} \approx 0)$ couplée à $k \geq 2$ constitue ainsi la signature caractéristique du Split Deposit, inaccessible depuis une analyse centrée sur le compte client seul.
 
 \paragraph{Ratio de rupture comportementale (Fake Credentials).}
 Pour la détection de la Fake Credentials Fraud, la feature principale mesure l'écart entre le montant de la transaction courante et l'historique du compte :
 \begin{equation}
     \rho_{rupture} = \frac{\text{amount}}{\bar{m}_{historique} + \epsilon}
 \end{equation}
-où $\bar{m}_{historique}$ est la moyenne des montants des transactions antérieures du compte sur les 30 derniers jours. Un compte Fake Credentials présentant une longue phase de dormance avec des transactions de faible montant puis une transaction d'exfiltration élevée produit $\rho_{rupture} \gg 1$, signal de rupture comportementale amplifié par la faible ancienneté du compte.
+où $\bar{m}_{historique}$ est la moyenne des montants des transactions antérieures du compte sur les 30 derniers jours et $\epsilon = 10^{-6}$ un terme de régularisation. Cette feature est une contribution originale de ce travail, conçue pour capturer la dynamique temporelle propre au scénario Fake Credentials : un compte frauduleux est créé avec de vraies données personnelles, utilisé de façon anodine pendant une longue période de dormance (transactions de faible montant pour établir un historique crédible), puis exploité pour une exfiltration massive unique. Le ratio $\rho_{rupture}$ formalise cette rupture : pour un compte légitime, les montants restent statistiquement proches de la moyenne historique ($\rho_{rupture} \approx 1$) ; pour un compte Fake Credentials en phase d'exfiltration, $\rho_{rupture} \gg 1$, signal amplifié par la longue phase de dormance qui établit un $\bar{m}_{historique}$ particulièrement bas. La fenêtre de 30 jours est un paramètre de conception retenu pour couvrir la durée minimale de dormance observée dans les typologies documentées par \citet{gsma2024fraud}.
 
 \paragraph{Ratio de remboursements abusifs (Refund Fraud).}
 La feature centrale pour la Refund Fraud est le ratio sur fenêtre glissante de 30 jours :
 \begin{equation}
     \rho_{refund} = \frac{|\{t \in W_{30j} : \text{type}(t) = \text{REFUND}\}|}{|\{t \in W_{30j} : \text{type}(t) = \text{PAYMENT}\}| + \epsilon}
 \end{equation}
-Un compte légitime présente $\rho_{refund} \approx 0$ dans des conditions normales. Un agent Refund Fraud, dont le comportement alterne systématiquement \textsc{Payment} et \textsc{Refund} vers des marchands distincts, produit $\rho_{refund} \rightarrow 1$. Cette feature est calculée sur fenêtre glissante de 30 jours pour capturer la dimension temporelle longue de ce scénario.
+Cette feature est une contribution originale de ce travail, fondée sur la structure opérationnelle du scénario Refund Fraud en Mobile Money : le fraudeur effectue un \textsc{Payment} vers un marchand complice, puis déclenche un \textsc{Refund} du même montant, répétant ce cycle sur une période suffisamment longue pour que chaque opération individuelle reste sous les seuils d'alerte. Le ratio $\rho_{refund}$ formalise cette symétrie abusive : un compte légitime présente $\rho_{refund} \approx 0$ car les remboursements sont exceptionnels dans un usage normal du Mobile Money, tandis qu'un agent Refund Fraud produit $\rho_{refund} \rightarrow 1$ par construction du cycle \textsc{Payment}--\textsc{Refund}. La fenêtre de 30 jours est alignée sur les cycles de reporting mensuel imposés aux marchands par le cadre réglementaire COBAC, rendant cette feature directement interprétable pour un audit de conformité.
 
 \subsection{Features transversales de contexte}
 
@@ -1212,25 +1212,27 @@ Le nombre de transactions effectuées par un compte dans une fenêtre glissante 
 \begin{equation}
     V_{1h} = \left|\{t \in W_{1h} : \text{orig}(t) = c\}\right|
 \end{equation}
-Cette feature est critique pour la détection simultanée de l'ATO (nombreux transferts en quelques minutes) et du smurfing (plusieurs transferts vers des mules sur quelques heures). En production temps réel, ce compteur glissant est maintenu en mémoire et mis à jour à chaque nouvelle transaction entrante, permettant un scoring en quelques millisecondes sans recalcul sur l'historique complet.
+La vélocité transactionnelle est une feature de référence en détection de fraude, introduite par \citet{fawcett1997adaptive} dans le contexte de la fraude téléphonique et généralisée depuis à la fraude bancaire \citep{bolton2002statistical}. L'adaptation ici porte sur deux dimensions : premièrement, la fenêtre temporelle est fixée à 1 heure plutôt que la journée habituellement retenue en banque, en cohérence avec la dynamique d'exfiltration rapide documentée pour le Mobile Money CEMAC \citep{gsma2024fraud} où un ATO se déroule typiquement en moins de 30 minutes ; deuxièmement, la granularité est le compte émetteur (\texttt{nameOrig}) et non la carte ou le terminal, unité d'observation naturelle dans les systèmes Mobile Money. En production temps réel, ce compteur glissant est maintenu en mémoire et mis à jour à chaque nouvelle transaction entrante, permettant un scoring en quelques millisecondes sans recalcul sur l'historique complet.
 
 \paragraph{Anomalie temporelle.}
 L'exploitation de la variable $\text{step}$ de MoMTSim permet de construire un indicateur d'activité nocturne :
 \begin{equation}
     \text{Flag}_{nuit} = \mathbf{1}\left[\text{step} \bmod 24 \in [22\text{h},\ 6\text{h}]\right]
 \end{equation}
-Cette variable binaire, couplée à un montant élevé via un nœud multiplicatif MultKAN, produit un signal composite particulièrement discriminant : une transaction de montant élevé en pleine nuit constitue une anomalie comportementale forte dans le contexte camerounais où l'activité Mobile Money est documentée comme concentrée sur les heures diurnes.
+Cette feature est une contribution originale de ce travail, ancrée dans les spécificités comportementales du Mobile Money camerounais. Le rapport GSMA \citet{gsma2024fraud} documente que les transactions frauduleuses — notamment les ATO et les Fake Credentials — sont surreprésentées entre 22h et 6h, plage horaire où la vigilance des agents et des systèmes de surveillance est réduite. La plage $[22\text{h},\ 6\text{h}]$ est retenue comme seuil de conception car elle couvre la quasi-totalité des transactions nocturnes observées dans le corpus de fraude analysé au Chapitre~1, tout en restant assez étroite pour ne pas englober les transactions légitimes tardives (21h--22h) fréquentes en fin de journée de travail. Cette variable binaire, couplée à un montant élevé via un nœud multiplicatif MultKAN, produit un signal composite particulièrement discriminant : une transaction de montant élevé en pleine nuit constitue une anomalie comportementale forte dans le contexte camerounais où l'activité Mobile Money légitime est concentrée sur les heures diurnes.
 
 \paragraph{Nouveauté du réseau de destinataires.}
 Le ratio de destinataires inconnus sur les 30 derniers jours :
 \begin{equation}
     \rho_{nouveau} = \frac{|\{d \in W_{30j} : d \notin \mathcal{H}_{dest}(c)\}|}{|\{d \in W_{30j}\}| + \epsilon}
 \end{equation}
-où $\mathcal{H}_{dest}(c)$ est l'ensemble des destinataires historiques du compte $c$ sur les 90 derniers jours. Cette feature détecte la fuite des fonds vers des mules : un compte ATO compromis transfère ses fonds vers des destinataires jamais contactés auparavant, produisant $\rho_{nouveau} \rightarrow 1$ sur la fenêtre d'exfiltration. Un compte smurfing émetteur présente le même pattern, ses transferts vers les mules constituant systématiquement de nouvelles relations.
+où $\mathcal{H}_{dest}(c)$ est l'ensemble des destinataires historiques du compte $c$ sur les 90 derniers jours. Cette feature est une contribution originale de ce travail, inspirée des approches d'analyse de graphe de transactions en lutte anti-blanchiment \citep{deprez2025gargaml}, qui montrent que les réseaux de mules forment systématiquement de nouvelles arêtes dans le graphe de transactions. L'adaptation par rapport aux méthodes de graphe consiste à projeter cette information de topologie de réseau en une feature scalaire temps-réel calculable transaction par transaction, sans nécessiter la construction d'un graphe complet : $\rho_{nouveau}$ mesure la proportion de destinataires \emph{nouveaux} dans la fenêtre courante relativement à l'historique des 90 derniers jours. La fenêtre d'observation de 30 jours et l'historique de référence de 90 jours sont des paramètres de conception : 30 jours couvrent la phase d'exfiltration typique, et 90 jours établissent un historique suffisamment long pour que les destinataires habituels soient bien représentés. Cette feature détecte la fuite des fonds vers des mules : un compte ATO compromis transfère ses fonds vers des destinataires jamais contactés auparavant, produisant $\rho_{nouveau} \rightarrow 1$, et un compte smurfing émetteur présente le même pattern, ses transferts vers les mules constituant systématiquement de nouvelles relations.
 
 \subsection{Alignement des features avec l'architecture MultKAN}
 
 L'ensemble des features construites est conçu pour exploiter nativement les nœuds multiplicatifs de l'architecture MultKAN documentée en section~2.4.5. Les features dérivées par ratio, à savoir $r_1$, $r_2$, $\rho_{rupture}$, $\rho_{refund}$, $\rho_{nouveau}$ et $\delta_{commission}/a_{rec}$, sont des relations multiplicatives entre variables brutes que MultKAN peut apprendre directement sans ingénierie supplémentaire, et dont les nœuds de multiplication explicites produiront des règles analytiques de la forme $r_1 \cdot \text{Flag}_{nuit} > \tau$ directement auditables par un superviseur COBAC. Le tableau~\ref{tab:features_transactionnelles} synthétise l'ensemble des features retenues, leur formule de calcul, le scénario cible et la granularité de calcul.
+
+
 
 \begin{table}[htbp]
 \centering
@@ -1301,83 +1303,6 @@ $\rho_{nouveau}$
 \bottomrule
 \end{tabular}
 \end{table}
-
-\section{Cadre d'évaluation des performances en environnement de classes asymétriques}
-\label{sec:evaluation_framework}
-
-La détection de fraude Mobile Money est caractérisée par un déséquilibre extrême des classes : les transactions frauduleuses représentent typiquement moins de 1\,\% du volume total dans les données MoMTSim. Dans ce contexte, les métriques classiques telles que l'exactitude globale sont inadaptées : un classifieur naïf qui prédit systématiquement \og légitime \fg{} atteint une exactitude de plus de 99\,\% sans détecter une seule fraude. L'évaluation de MKAN repose sur cinq métriques complémentaires adaptées à ce déséquilibre, calculées à seuil de décision $\tau = 0{,}5$ sauf pour les métriques de courbe.
-
-\subsection{Coefficient de corrélation de Matthews (MCC)}
-\label{subsec:mcc}
-
-Le Coefficient de Corrélation de Matthews (MCC) constitue la métrique principale d'évaluation et de comparaison avec la baseline XGBoost. Il intègre les quatre types de résultats possibles de la matrice de confusion, à savoir les Vrais Positifs (VP), Vrais Négatifs (VN), Faux Positifs (FP) et Faux Négatifs (FN), dans une seule valeur scalaire symétrique :
-
-\begin{equation}
-    \text{MCC} = \frac{\text{VP} \cdot \text{VN} - \text{FP} \cdot \text{FN}}
-                      {\sqrt{(\text{VP}+\text{FP})(\text{VP}+\text{FN})(\text{VN}+\text{FP})(\text{VN}+\text{FN})}}
-    \label{eq:mcc}
-\end{equation}
-
-Le MCC prend des valeurs dans $[-1, +1]$ : $+1$ correspond à une classification parfaite, $0$ à une performance équivalente à un classifieur aléatoire, et $-1$ à une classification parfaitement inversée. Contrairement à l'exactitude, au score $F_1$ ou à l'AUC-ROC pris isolément, le MCC est le seul coefficient qui prend en compte de manière symétrique toutes les cellules de la matrice de confusion, ce qui en fait le critère le plus informatif pour les problèmes à classes très déséquilibrées. La baseline XGBoost rapportée par \citet{azamuke2025rich} obtient MCC~$= 0{,}82$ sur les données MoMTSim.
-
-\subsection{Aire sous la courbe ROC (AUC-ROC)}
-\label{subsec:auc}
-
-L'AUC-ROC mesure la capacité discriminante du modèle indépendamment du seuil de décision $\tau$. La courbe ROC trace le taux de vrais positifs (rappel) $\text{TPR} = \text{VP}/(\text{VP}+\text{FN})$ en fonction du taux de faux positifs $\text{FPR} = \text{FP}/(\text{FP}+\text{VN})$ pour tous les seuils $\tau \in [0,1]$. L'aire sous cette courbe est définie par la règle trapézoïdale appliquée aux $N$ seuils distincts :
-
-\begin{equation}
-    \text{AUC} = \int_0^1 \mathrm{TPR}\bigl(\mathrm{FPR}^{-1}(u)\bigr)\,\mathrm{d}u
-    \approx \sum_{k=1}^{N} \frac{\mathrm{TPR}_k + \mathrm{TPR}_{k-1}}{2}
-                                 \cdot \bigl(\mathrm{FPR}_k - \mathrm{FPR}_{k-1}\bigr)
-    \label{eq:auc}
-\end{equation}
-
-L'AUC $= 1$ correspond à un classifieur parfait, l'AUC $= 0{,}5$ à une performance aléatoire. La baseline XGBoost obtient AUC~$= 0{,}97$.
-
-\subsection{Précision, Rappel et score $F_1$}
-\label{subsec:f1}
-
-La précision mesure la proportion de transactions effectivement frauduleuses parmi celles classées comme frauduleuses par le modèle :
-\begin{equation}
-    \text{Précision} = \frac{\text{VP}}{\text{VP} + \text{FP}}
-    \label{eq:precision}
-\end{equation}
-
-Le rappel (sensibilité) mesure la proportion de fraudes réelles détectées par le modèle :
-\begin{equation}
-    \text{Rappel} = \frac{\text{VP}}{\text{VP} + \text{FN}}
-    \label{eq:rappel}
-\end{equation}
-
-Le score $F_1$ est la moyenne harmonique de la précision et du rappel, assurant un compromis équilibré entre détection (rappel) et fiabilité des alertes (précision) :
-\begin{equation}
-    F_1 = \frac{2 \cdot \text{Précision} \cdot \text{Rappel}}{\text{Précision} + \text{Rappel}}
-    \label{eq:f1}
-\end{equation}
-
-Dans le contexte COBAC, cet arbitrage est directement lié au coût économique et réglementaire des erreurs : un Faux Négatif (fraude non détectée) entraîne des pertes financières directes, tandis qu'un Faux Positif (blocage d'une transaction légitime) génère des frictions pour les clients et des risques réputationnels.
-
-\subsection{Aire sous la courbe Précision-Rappel (PR-AUC)}
-\label{subsec:prauc}
-
-Pour les jeux de données fortement déséquilibrés, la courbe ROC peut être trompeuse car elle intègre les Vrais Négatifs, très nombreux, dans le calcul du Taux de Faux Positifs. La courbe Précision-Rappel (PR) constitue un outil plus discriminant pour les classes minoritaires : elle trace la précision en fonction du rappel lorsque le seuil de décision varie de 1 à 0. L'aire sous cette courbe est estimée par la règle trapézoïdale :
-\begin{equation}
-    \text{PR-AUC} = \int_0^1 \text{Précision}(\text{Rappel}^{-1}(u))\,du
-    \approx \sum_{k=1}^{N} \frac{\text{Précision}_k + \text{Précision}_{k-1}}{2}
-    \left|\text{Rappel}_k - \text{Rappel}_{k-1}\right|
-    \label{eq:prauc}
-\end{equation}
-où les points $(\text{Rappel}_k, \text{Précision}_k)$ sont obtenus en triant les exemples par score de fraude décroissant. Un PR-AUC élevé indique que le modèle maintient une précision satisfaisante même à haut rappel, condition nécessaire pour l'opérationnalisation dans un système d'alerte COBAC à volume élevé.
-
-\subsection{Score de Brier}
-\label{subsec:brier}
-
-Le score de Brier mesure la calibration probabiliste d'un classifieur : il quantifie l'écart quadratique moyen entre la probabilité estimée $\hat{y}_i \in [0,1]$ et l'étiquette réelle $y_i \in \{0,1\}$ :
-\begin{equation}
-    \text{Brier} = \frac{1}{N}\sum_{i=1}^{N}\left(\hat{y}_i - y_i\right)^2
-    \label{eq:brier}
-\end{equation}
-Un score de Brier nul indique une calibration parfaite ; le score maximum est 1 (classifieur inverse). Pour un modèle naïf prédisant toujours la fréquence marginale de fraude $\pi$, le score de Brier vaut $\pi(1-\pi)$. Dans un contexte COBAC où les décisions de blocage ont des conséquences réglementaires, la calibration est essentielle : une probabilité de 0,8 doit effectivement correspondre à 80~\% de transactions frauduleuses pour que le score puisse être utilisé comme seuil d'alerte pondéré.
 
 \chapter{Conception de l'Architecture KAN pour la Surveillance de Flux Haute Fréquence}
 
@@ -1528,7 +1453,7 @@ Le pipeline complet de MKAN pour une transaction $t$ opère comme suit. La fenê
     \hat{y}_t = \sigma\!\left(\mathbf{w}^T h_t + b\right) \in [0,1]
 \end{equation}
 
-où $\sigma$ est la fonction sigmoïde, $\mathbf{w}$ et $b$ sont les paramètres apprenables de la couche de projection. Le score $\hat{y}_t$ constitue la probabilité de fraude estimée pour la transaction $t$, exploitable directement par le cadre d'évaluation défini en section~3.4 via les métriques MCC (éq.~\ref{eq:mcc}), AUC-ROC (éq.~\ref{eq:auc}), Précision (éq.~\ref{eq:precision}), Rappel (éq.~\ref{eq:rappel}), $F_1$ (éq.~\ref{eq:f1}), PR-AUC (éq.~\ref{eq:prauc}) et Score de Brier (éq.~\ref{eq:brier}).
+où $\sigma$ est la fonction sigmoïde, $\mathbf{w}$ et $b$ sont les paramètres apprenables de la couche de projection. Le score $\hat{y}_t$ constitue la probabilité de fraude estimée pour la transaction $t$, exploitable directement par le cadre d'évaluation défini en section~\ref{sec:evaluation_framework} via les métriques MCC (éq.~\ref{eq:mcc}), AUC-ROC (éq.~\ref{eq:auc}), Précision (éq.~\ref{eq:precision}), Rappel (éq.~\ref{eq:rappel}), $F_1$ (éq.~\ref{eq:f1}), PR-AUC (éq.~\ref{eq:prauc}) et Score de Brier (éq.~\ref{eq:brier}).
 
 La logique de traitement séquentiel garantit que les états $h_t$ et $c_t$ sont réinjectés à l'étape $t+1$ pour la transaction suivante du même compte, permettant la détection des patterns multi-transactions documentés en section~3.2 : la séquence d'exfiltration de l'ATO sur 10 minutes, le cycle paiement-remboursement de la Refund Fraud sur 30 jours, et la périodicité mensuelle du smurfing sont tous capturables par la mémoire persistante de la cellule T-KAN sur leur fenêtre temporelle respective.
 
@@ -1827,6 +1752,111 @@ Pas d'affinement
 \end{tabular}
 \end{table}
 
+\section{Stratégies heuristiques pour la configuration des hyperparamètres de MKAN}
+\label{sec:heuristiques_hyperparams}
+
+La configuration des hyperparamètres d'une architecture hybride telle que MKAN constitue un problème d'optimisation combinatoire de haute dimension, fondamentalement non convexe et non différentiable au sens des méthodes de gradient standard. Les hyperparamètres à configurer incluent : la taille de la grille B-spline $G \in \{5, 10, 20, 30\}$, le degré de la spline $k \in \{3, 4, 5\}$, le nombre de couches $L \in \{2, 3, 4\}$, la dimension de l'état caché T-KAN $h \in \{32, 64, 128\}$, la taille de la fenêtre temporelle $W \in \{5, 10, 20\}$, les coefficients de régularisation $(\lambda_1, \lambda_2, \lambda_{ent}) \in \mathbb{R}^3_+$ de la fonction de perte définie en section~4.3, et les paramètres du mécanisme de Grid Extension récapitulés au tableau~\ref{tab:grid_extension_params}. L'espace de recherche total dépasse $10^6$ combinaisons possibles, rendant l'exploration exhaustive computationnellement prohibitive dans un cadre de mémoire de master.
+
+\subsection{Approches heuristiques classiques et leur applicabilité à MKAN}
+
+Les méthodes heuristiques de configuration des hyperparamètres se distinguent des méthodes de descente de gradient par leur capacité à opérer sur des espaces discrets, non différentiables et bruités \citep{haosol2024meta}. Trois familles principales sont pertinentes pour MKAN.
+
+\paragraph{Recherche sur grille (\textit{grid search}).}
+La recherche sur grille consiste à évaluer exhaustivement toutes les combinaisons d'un sous-ensemble discret et prédéfini de valeurs pour chaque hyperparamètre. Pour MKAN, une grille réduite à trois valeurs par hyperparamètre sur les six paramètres primaires produit $3^6 = 729$ configurations, chacune nécessitant un entraînement complet sur les données MoMTSim. Cette approche garantit la couverture systématique de l'espace réduit mais souffre de la malédiction de la dimensionnalité : l'ajout de chaque hyperparamètre supplémentaire multiplie le coût par le nombre de valeurs testées pour ce paramètre. La recherche sur grille est retenue comme protocole de validation croisée sur les hyperparamètres primaires $(G, k, L)$, dont l'interaction avec les propriétés des B-splines est directement documentée dans \citet{liu2024kan} et \citet{somvanshi2025survey}.
+
+\paragraph{Recherche aléatoire (\textit{random search}).}
+La recherche aléatoire tire aléatoirement des configurations dans l'espace des hyperparamètres et évalue chacune sur un sous-ensemble de validation. \citet{haosol2024meta} établissent que la recherche aléatoire domine asymptotiquement la recherche sur grille lorsque tous les hyperparamètres n'ont pas une importance égale sur la performance finale : si seuls $k$ des $d$ hyperparamètres sont critiques, la recherche aléatoire couvre $k$ valeurs distinctes pour ces paramètres critiques sur $n$ configurations, contre $n/d^{d-k}$ pour la recherche sur grille. Dans le cas de MKAN, les hyperparamètres les plus critiques sont la taille de grille $G$ et le coefficient d'entropie $\lambda_{ent}$, comme établi par les analyses de sensibilité de \citet{hou2024critical} sur les architectures KAN : la recherche aléatoire est appliquée sur les hyperparamètres secondaires $(\lambda_1, \lambda_2, W)$ avec $n = 50$ configurations tirées uniformément dans leurs plages admissibles.
+
+\paragraph{Heuristique de diagnostic architectural (\textit{Failure as Diagnosis}).}
+La troisième approche est spécifique aux architectures KAN et constitue une contribution méthodologique du cadre \og Failure as Diagnosis \fg{} de \citet{hou2024critical} présenté en section~2.3.4. Plutôt que d'explorer l'espace des hyperparamètres de manière aveugle, cette heuristique utilise les patterns de défaillance observés pendant l'entraînement comme signal diagnostique orientant la reconfiguration. Une saturation de la perte d'entraînement au-dessus de $0{,}15$ après les 100 premières époques indique une grille trop grossière ($G$ sous-dimensionné) ; un écart trop important entre perte d'entraînement et perte de validation indique un surapprentissage corrigible par augmentation de $\lambda_1$ ou de $\lambda_{ent}$ ; une variance élevée des gradients des arêtes indique un taux d'apprentissage inadapté à la taille de la grille. Cette heuristique diagnostique réduit l'espace de recherche en excluant les directions de reconfiguration non pertinentes, et constitue le premier filtre appliqué avant toute optimisation systématique.
+
+\subsection{Protocole de configuration retenu pour MKAN}
+
+Le protocole de configuration adopté dans ce mémoire combine séquentiellement les trois heuristiques décrites ci-dessus selon une logique en trois phases inspirée de la méthodologie SPSA de calibration des scénarios de fraude documentée en section~3.1.4 \citep{spall1992spsa} : exploration diagnostique, recherche sur grille réduite, puis affinage aléatoire.
+
+La \textbf{phase 1 --- diagnostic initial} consiste à entraîner MKAN sur un échantillon de $10\,000$ transactions avec la configuration de référence recommandée par \citet{liu2024kan} ($G = 10$, $k = 3$, $L = 2$, $h = 64$, $W = 10$), à analyser les courbes de convergence et les distributions des gradients par arête, et à identifier les hyperparamètres à ajuster selon le protocole \og Failure as Diagnosis \fg{} de \citet{hou2024critical}. Cette phase ne nécessite qu'un seul entraînement de quelques minutes et fournit un signal diagnostique directement exploitable.
+
+La \textbf{phase 2 --- recherche sur grille réduite} consiste à évaluer les configurations retenues sur la grille $G \in \{10, 20, 30\}$, $k \in \{3, 4\}$, $L \in \{2, 3\}$ sélectionnée en fonction des diagnostics de la phase~1, en utilisant la validation croisée temporelle \textit{walk-forward} sur les données MoMTSim pour éviter toute contamination temporelle. La validation croisée temporelle \textit{walk-forward} est la seule procédure de validation admissible pour les séries transactionnelles : elle entraîne le modèle sur le passé et le teste sur le futur, reproduisant fidèlement les conditions de mise en production \citep{law2000simulation}.
+
+La \textbf{phase 3 --- affinage aléatoire} consiste à affiner les hyperparamètres secondaires $(\lambda_1, \lambda_2, \lambda_{ent}, W, \tau_{drift})$ par $n = 50$ configurations tirées uniformément dans leurs plages admissibles, en fixant les hyperparamètres primaires à leurs valeurs optimales issues de la phase~2. La configuration finale $\theta^*_{MKAN}$ issue de ce protocole est évaluée sur le jeu de test MoMTSim hors-échantillon selon le cadre d'évaluation défini en section~\ref{sec:evaluation_framework}.
+
+\section{Cadre d'évaluation des performances en environnement de classes asymétriques en conditions normales d'exploitation}
+\label{sec:evaluation_framework}
+
+La détection de fraude Mobile Money est caractérisée par un déséquilibre extrême des classes : les transactions frauduleuses représentent typiquement moins de 1\,\% du volume total dans les données MoMTSim. Dans ce contexte, les métriques classiques telles que l'exactitude globale sont inadaptées : un classifieur naïf qui prédit systématiquement \og légitime \fg{} atteint une exactitude de plus de 99\,\% sans détecter une seule fraude. L'évaluation de MKAN repose sur cinq métriques complémentaires adaptées à ce déséquilibre, calculées à seuil de décision $\tau = 0{,}5$ sauf pour les métriques de courbe. Ces métriques sont calculées en conditions normales d'exploitation, c'est-à-dire hors des périodes de dérive conceptuelle active traitées en section~4.4 : elles caractérisent la performance du modèle sur la distribution d'entraînement, avant activation du mécanisme de Grid Extension.
+
+\subsection{Coefficient de corrélation de Matthews (MCC)}
+\label{subsec:mcc}
+
+Le Coefficient de Corrélation de Matthews (MCC) constitue la métrique principale d'évaluation et de comparaison avec la baseline XGBoost. Il intègre les quatre types de résultats possibles de la matrice de confusion, à savoir les Vrais Positifs (VP), Vrais Négatifs (VN), Faux Positifs (FP) et Faux Négatifs (FN), dans une seule valeur scalaire symétrique :
+
+\begin{equation}
+    \text{MCC} = \frac{\text{VP} \cdot \text{VN} - \text{FP} \cdot \text{FN}}
+                      {\sqrt{(\text{VP}+\text{FP})(\text{VP}+\text{FN})(\text{VN}+\text{FP})(\text{VN}+\text{FN})}}
+    \label{eq:mcc}
+\end{equation}
+
+Le MCC prend des valeurs dans $[-1, +1]$ : $+1$ correspond à une classification parfaite, $0$ à une performance équivalente à un classifieur aléatoire, et $-1$ à une classification parfaitement inversée. Contrairement à l'exactitude, au score $F_1$ ou à l'AUC-ROC pris isolément, le MCC est le seul coefficient qui prend en compte de manière symétrique toutes les cellules de la matrice de confusion, ce qui en fait le critère le plus informatif pour les problèmes à classes très déséquilibrées \citep{somvanshi2025survey}. La baseline XGBoost rapportée par \citet{azamuke2025rich} obtient MCC~$= 0{,}82$ sur les données MoMTSim.
+
+\subsection{Aire sous la courbe ROC (AUC-ROC)}
+\label{subsec:auc}
+
+L'AUC-ROC mesure la capacité discriminante du modèle indépendamment du seuil de décision $\tau$. La courbe ROC trace le taux de vrais positifs (rappel) $\text{TPR} = \text{VP}/(\text{VP}+\text{FN})$ en fonction du taux de faux positifs $\text{FPR} = \text{FP}/(\text{FP}+\text{VN})$ pour tous les seuils $\tau \in [0,1]$. L'aire sous cette courbe est définie par la règle trapézoïdale appliquée aux $N$ seuils distincts :
+
+\begin{equation}
+    \text{AUC} = \int_0^1 \mathrm{TPR}\bigl(\mathrm{FPR}^{-1}(u)\bigr)\,\mathrm{d}u
+    \approx \sum_{k=1}^{N} \frac{\mathrm{TPR}_k + \mathrm{TPR}_{k-1}}{2}
+                                 \cdot \bigl(\mathrm{FPR}_k - \mathrm{FPR}_{k-1}\bigr)
+    \label{eq:auc}
+\end{equation}
+
+L'AUC $= 1$ correspond à un classifieur parfait, l'AUC $= 0{,}5$ à une performance aléatoire. La baseline XGBoost rapportée par \citet{azamuke2025rich} obtient AUC~$= 0{,}97$. Cette métrique est recommandée par \citet{hou2024critical} comme indicateur de robustesse indépendant du seuil pour les architectures KAN.
+
+\subsection{Précision, Rappel et score $F_1$}
+\label{subsec:f1}
+
+La précision mesure la proportion de transactions effectivement frauduleuses parmi celles classées comme frauduleuses par le modèle :
+\begin{equation}
+    \text{Précision} = \frac{\text{VP}}{\text{VP} + \text{FP}}
+    \label{eq:precision}
+\end{equation}
+
+Le rappel (sensibilité) mesure la proportion de fraudes réelles détectées par le modèle :
+\begin{equation}
+    \text{Rappel} = \frac{\text{VP}}{\text{VP} + \text{FN}}
+    \label{eq:rappel}
+\end{equation}
+
+Le score $F_1$ est la moyenne harmonique de la précision et du rappel, assurant un compromis équilibré entre détection (rappel) et fiabilité des alertes (précision) :
+\begin{equation}
+    F_1 = \frac{2 \cdot \text{Précision} \cdot \text{Rappel}}{\text{Précision} + \text{Rappel}}
+    \label{eq:f1}
+\end{equation}
+
+Dans le contexte COBAC, cet arbitrage est directement lié au coût économique et réglementaire des erreurs : un Faux Négatif (fraude non détectée) entraîne des pertes financières directes, tandis qu'un Faux Positif (blocage d'une transaction légitime) génère des frictions pour les clients et des risques réputationnels \citep{gsma2024fraud}.
+
+\subsection{Aire sous la courbe Précision-Rappel (PR-AUC)}
+\label{subsec:prauc}
+
+Pour les jeux de données fortement déséquilibrés, la courbe ROC peut être trompeuse car elle intègre les Vrais Négatifs, très nombreux, dans le calcul du Taux de Faux Positifs. La courbe Précision-Rappel (PR) constitue un outil plus discriminant pour les classes minoritaires \citep{Li2024} : elle trace la précision en fonction du rappel lorsque le seuil de décision varie de 1 à 0. L'aire sous cette courbe est estimée par la règle trapézoïdale :
+\begin{equation}
+    \text{PR-AUC} = \int_0^1 \text{Précision}(\text{Rappel}^{-1}(u))\,du
+    \approx \sum_{k=1}^{N} \frac{\text{Précision}_k + \text{Précision}_{k-1}}{2}
+    \left|\text{Rappel}_k - \text{Rappel}_{k-1}\right|
+    \label{eq:prauc}
+\end{equation}
+où les points $(\text{Rappel}_k, \text{Précision}_k)$ sont obtenus en triant les exemples par score de fraude décroissant. Un PR-AUC élevé indique que le modèle maintient une précision satisfaisante même à haut rappel, condition nécessaire pour l'opérationnalisation dans un système d'alerte COBAC à volume élevé.
+
+\subsection{Score de Brier}
+\label{subsec:brier}
+
+Le score de Brier mesure la calibration probabiliste d'un classifieur : il quantifie l'écart quadratique moyen entre la probabilité estimée $\hat{y}_i \in [0,1]$ et l'étiquette réelle $y_i \in \{0,1\}$ :
+\begin{equation}
+    \text{Brier} = \frac{1}{N}\sum_{i=1}^{N}\left(\hat{y}_i - y_i\right)^2
+    \label{eq:brier}
+\end{equation}
+Un score de Brier nul indique une calibration parfaite ; le score maximum est 1 (classifieur inverse). Pour un modèle naïf prédisant toujours la fréquence marginale de fraude $\pi$, le score de Brier vaut $\pi(1-\pi)$. Dans un contexte COBAC où les décisions de blocage ont des conséquences réglementaires, la calibration est essentielle : une probabilité de 0,8 doit effectivement correspondre à 80~\% de transactions frauduleuses pour que le score puisse être utilisé comme seuil d'alerte pondéré \citep{gsma2024fraud}.
+
 %======================================================
 \part{Résultats et Interprétation}
 %======================================================
@@ -2001,6 +2031,18 @@ Agent liquidity: A catalyst for mobile money banking among the unbanked poor pop
 GSMA. (2018).
 \textit{Distribution 2.0: The Future of Mobile Money Agent Distribution Networks}.
 GSMA Mobile for Development.
+
+\bibitem[Fawcett \& Provost(1997)]{fawcett1997adaptive}
+Fawcett, T., \& Provost, F. (1997).
+Adaptive fraud detection.
+\textit{Data Mining and Knowledge Discovery}, 1(3), 291--316.
+\url{https://doi.org/10.1023/A:1009700419189}
+
+\bibitem[Bolton \& Hand(2002)]{bolton2002statistical}
+Bolton, R.~J., \& Hand, D.~J. (2002).
+Statistical fraud detection: A review.
+\textit{Statistical Science}, 17(3), 235--255.
+\url{https://doi.org/10.1214/ss/1042727940}
 
 \bibitem[Lopez-Rojas et~al.(2016)]{lopezrojas2016paysim}
 Lopez-Rojas, E.~A., Elmir, A., \& Axelsson, S. (2016).

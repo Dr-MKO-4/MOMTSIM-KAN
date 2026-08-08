@@ -152,7 +152,7 @@ class SSEFraudCalibrator:
         # Normalisation : sum(Dr) sur tous les scénarios × bins (section 3.1.4)
         self._Dr_scale = max(1.0, float(self._Dr.sum()))
 
-        bounds_lo = torch.tensor([1e-4, 1e-4, 1e-4, 1e-4, 0.1])
+        bounds_lo = torch.tensor([0.02, 0.02, 1e-4, 0.02, 0.5])
         bounds_hi = torch.tensor([0.5,  0.5,  0.3,  0.5,  10.0])
 
         if x0 is None:
@@ -163,7 +163,7 @@ class SSEFraudCalibrator:
             Dr_per_step = float(self._Dr.mean()) / self.bin_size
             k = max(1, self.n_mules)
             k_eff   = [k,   k,   1.0, k  ]  # ATO, REFUND, FAKE_CRED, SPLIT_DEP
-            avg_tx  = [3.0, 1.5, 2.0, 3.0]  # tx moyennes par événement par scénario
+            avg_tx  = [3.0, 1.5, 2.0, 6.0]  # tx moyennes par événement (SPLIT_DEP ~6 fragments/appel)
             p_init = [
                 float(np.clip(Dr_per_step / max(1.0, k_eff[i] * avg_tx[i]),
                               float(bounds_lo[i]), float(bounds_hi[i])))

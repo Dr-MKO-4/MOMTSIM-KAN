@@ -608,9 +608,9 @@ class TorchFraudInjector:
         n = int(self.gen.integers(c["n_min"], c["n_max"] + 1))
         chosen_mules = self.gen.choice(self.mule_ids, size=min(n, len(self.mule_ids)), replace=False)
 
-        # Timing intra-step : Δt_i ~ Exp(λ_ATO) (eq. scénario ATO, section 3.2.1)
-        # λ_ATO calibré pour fenêtre totale < 10 min (600 s) : mean Δt = 1/λ_ATO
-        lam_ato   = float(c.get("lambda_ato_per_s", 1.0 / 120))  # défaut : 2 min entre tx
+        # Timing intra-step : Δt_i ~ Exp(λ_ATO) (§3.2.1)
+        # lambda_ato (config) = intervalle moyen en minutes entre transferts ATO
+        lam_ato = 1.0 / (float(c.get("lambda_ato", 2)) * 60)  # → 1/120 s⁻¹ si lambda_ato=2
         raw_delays = self.gen.exponential(scale=1.0 / lam_ato, size=len(chosen_mules))
         time_offsets_s = [float(v) for v in raw_delays.cumsum()]  # t0=0, t1, t2, ...
 
@@ -641,7 +641,7 @@ class TorchFraudInjector:
         if not self._refund_vuln_list or self._refund_merchant_idx >= len(self._refund_vuln_list):
             return
 
-        # 30 % de transactions légitimes de camouflage (ratio_legit = 0.30)
+        # ratio_legit (défaut 0.30 §3.2.2) : probabilité de faire une tx légitime de camouflage
         if self.gen.uniform() < c["ratio_legit"]:
             merchant = int(self.gen.choice(self.merchant_ids))
             amount = max(float(self.gen.normal(3325, 800)), 100.0)
@@ -654,7 +654,7 @@ class TorchFraudInjector:
         # PAYMENT immédiat : fraudeur → marchand vulnérable
         self._log(step, "PAYMENT", amount, self._refund_fraudster, merchant, "REFUND")
 
-        # REFUND différé : Δt ~ U(1h, 48h) — marchand rembourse le fraudeur (eq. 3.2.2)
+        # REFUND différé : Δt ~ U(delay_min_hours, delay_max_hours) — marchand rembourse le fraudeur (§3.2.2)
         delay = int(self.gen.integers(c["delay_min_hours"], c["delay_max_hours"] + 1))
         self._pending.append((step + delay, "REFUND", amount, merchant,
                                self._refund_fraudster, "REFUND", False))
@@ -760,17 +760,18 @@ class TorchFraudInjector:
             return
         agent = int(self.gen.choice(self._split_dep_agents))
         client = int(self.gen.choice(self.client_ids))
-        total_deposit = float(self.gen.uniform(2000, 80000))
-        if float(self.engine.balance[agent].item()) < total_deposit:
-            return
+        available = float(self.engine.balance[agent].item())
+        if available < 2000:
+            return  # agent vraiment à sec — cas rare grâce au rebalancement toutes les 24h
+        total_deposit = float(self.gen.uniform(2000, min(80000.0, available)))
         fragments = self._optimal_fragmentation(total_deposit)
 
-        # Fenêtre temporelle intra-step : T_split ~ U(60s, 120s) (section 3.2.4)
-        # Les k fragments sont répartis uniformément dans cette fenêtre
+        # Fenêtre temporelle intra-step : T_split ~ U(T_split_min_sec, T_split_max_sec) (§3.2.4)
+        # Config : 60s–120s. Les k fragments sont répartis uniformément dans cette fenêtre.
         c_sd = self.cfg["split_deposit"]
         T_split = float(self.gen.uniform(
-            c_sd.get("T_split_min_sec", 60),
-            c_sd.get("T_split_max_sec", 120),
+            c_sd.get("T_split_min_sec", 120),
+            c_sd.get("T_split_max_sec", 600),
         ))
         if len(fragments) > 1:
             times_s = [float(v) for v in

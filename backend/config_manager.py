@@ -101,16 +101,16 @@ def save_sim_config(params: dict) -> str:
 
 
 def load_calib_config() -> dict:
-    """Charge calib_config.json, puis surcharge n_mules et max_slots depuis sim_config."""
+    """Charge calib_config.json. max_slots et n_mules sont intentionnellement
+    indépendants de sim_config : la calibration utilise max_slots≥50 (volume légit
+    non capé) et n_mules=800 (gradient SPSA stable avec 2 000 clients). La simulation
+    utilise max_slots=3 et n_mules=3200 (réseau de mules proportionnel à 500 K clients
+    pour atteindre le MID cible de 23 %).
+    """
     base = dict(_CALIB_DEFAULTS)
     if CALIB_CONFIG_PATH.exists():
         with open(CALIB_CONFIG_PATH, encoding="utf-8") as f:
             base.update(json.load(f))
-    # Synchronisation automatique des paramètres partagés avec la simulation
-    sim = load_sim_config()
-    for key in ("n_mules", "max_slots"):
-        if key in sim:
-            base[key] = sim[key]
     return base
 
 

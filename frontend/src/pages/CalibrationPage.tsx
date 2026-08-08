@@ -107,7 +107,7 @@ export default function CalibrationPage() {
               <FormField label="Marchands"     name="n_merchants"      value={params.n_merchants}      onChange={set} min={10} />
               <FormField label="Banques"       name="n_banks"          value={params.n_banks}          onChange={set} min={1} />
               <FormField label="Mules"         name="n_mules"          value={params.n_mules}          onChange={set} min={0} hint="← depuis sim_config.json" />
-              <FormField label="Max slots"     name="max_slots"        value={params.max_slots}        onChange={set} min={1} hint="← depuis sim_config.json" />
+              <FormField label="Max slots"     name="max_slots"        value={params.max_slots}        onChange={set} min={1} hint="≥ 50 requis en calibration" />
               <FormField label="target_mid"    name="target_mid"       value={params.target_mid}       onChange={set} min={0.1} max={0.5} isFloat hint="Taux de fraude cible" />
               <FormField label="n_steps"       name="n_steps"          value={params.n_steps}          onChange={set} min={24} />
               <FormField label="n_bins"        name="n_bins"           value={params.n_bins}           onChange={set} min={5} />

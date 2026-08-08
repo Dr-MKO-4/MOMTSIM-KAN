@@ -1,9 +1,9 @@
 {
-  "n_clients": 500,
-  "n_merchants": 12,
+  "n_clients": 2000,
+  "n_merchants": 200,
   "n_banks": 8,
-  "n_mules": 300,
-  "max_slots": 3,
+  "n_mules": 800,
+  "max_slots": 50,
   "target_mid": 0.23,
   "n_steps": 720,
   "n_bins": 30,

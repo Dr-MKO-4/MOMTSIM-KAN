@@ -14,16 +14,46 @@ interface AppState {
 
 const AppContext = createContext<AppState>(null!);
 
+function loadLS<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch { return null; }
+}
+
+function saveLS(key: string, value: unknown) {
+  try {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* quota exceeded — ignore */ }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [simJobId,    setSimJobId]    = useState<string | null>(null);
-  const [simResult,   setSimResult]   = useState<SimulationResult | null>(null);
-  const [calibJobId,  setCalibJobId]  = useState<string | null>(null);
-  const [calibResult, setCalibResult] = useState<CalibrationResult | null>(null);
+  const [simJobId,    setSimJobIdRaw]    = useState<string | null>(null);
+  const [calibJobId,  setCalibJobIdRaw]  = useState<string | null>(null);
+  const [simResult,   setSimResultRaw]   = useState<SimulationResult | null>(
+    () => loadLS<SimulationResult>("momtsim_sim_result")
+  );
+  const [calibResult, setCalibResultRaw] = useState<CalibrationResult | null>(
+    () => loadLS<CalibrationResult>("momtsim_calib_result")
+  );
+
+  const setSimResult = (r: SimulationResult | null) => {
+    saveLS("momtsim_sim_result", r);
+    setSimResultRaw(r);
+  };
+  const setCalibResult = (r: CalibrationResult | null) => {
+    saveLS("momtsim_calib_result", r);
+    setCalibResultRaw(r);
+  };
 
   return (
     <AppContext.Provider value={{
       simJobId, simResult, calibJobId, calibResult,
-      setSimJobId, setSimResult, setCalibJobId, setCalibResult,
+      setSimJobId: setSimJobIdRaw,
+      setSimResult,
+      setCalibJobId: setCalibJobIdRaw,
+      setCalibResult,
     }}>
       {children}
     </AppContext.Provider>

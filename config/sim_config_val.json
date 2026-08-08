@@ -1,0 +1,9 @@
+{
+  "n_clients": 150000,
+  "n_merchants": 3600,
+  "n_banks": 8,
+  "n_mules": 630,
+  "n_steps": 1440,
+  "max_slots": 3,
+  "seed": 1001
+}
