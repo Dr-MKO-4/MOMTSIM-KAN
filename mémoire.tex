@@ -1858,6 +1858,173 @@ Le score de Brier mesure la calibration probabiliste d'un classifieur : il quant
 Un score de Brier nul indique une calibration parfaite ; le score maximum est 1 (classifieur inverse). Pour un modèle naïf prédisant toujours la fréquence marginale de fraude $\pi$, le score de Brier vaut $\pi(1-\pi)$. Dans un contexte COBAC où les décisions de blocage ont des conséquences réglementaires, la calibration est essentielle : une probabilité de 0,8 doit effectivement correspondre à 80~\% de transactions frauduleuses pour que le score puisse être utilisé comme seuil d'alerte pondéré \citep{gsma2024fraud}.
 
 %======================================================
+\section{Pipeline d'implémentation et d'entraînement}
+\label{sec:pipeline}
+%======================================================
+
+Cette section documente les étapes techniques du pipeline MKAN tel qu'il est effectivement exécuté, depuis les fichiers \texttt{.parquet} bruts jusqu'au meilleur point de contrôle sauvegardé. Elle est complémentaire aux sections précédentes qui décrivent les fondements théoriques : ici, chaque choix d'implémentation est motivé par des contraintes pratiques d'environnement (GPU Intel Iris Xe via DirectML, 20~Go de RAM) et de volume (5,5~M de transactions en entraînement).
+
+%--------------------------------------------------
+\subsection{Stratégie de découpage et normalisation}
+\label{subsec:split}
+%--------------------------------------------------
+
+Pour éliminer le biais de déplétion des comptes propre aux simulations de fraude séquentielles --- notamment le scénario ATO dont la prévalence décroît naturellement à mesure que les comptes compromis sont épuisés --- les trois partitions sont issues de \textbf{simulations MOMTSIM indépendantes}, chacune générée avec une graine distincte (tableau~\ref{tab:splits}).
+
+\begin{table}[h!]
+\centering
+\caption{Partitions de données --- simulations indépendantes MOMTSIM}
+\label{tab:splits}
+\begin{tabular}{llrrrl}
+\hline
+\textbf{Partition} & \textbf{Seed} & \textbf{Clients} & \textbf{Transactions} & \textbf{Fraude} & \textbf{Rôle} \\
+\hline
+Train & 1000 & 510\,288 & 5\,569\,643 & 23{,}6~\% & Ajustement des paramètres \\
+Val   & 1001 & 153\,159 & 1\,578\,746 & 19{,}1~\% & Sélection des hyperparamètres \\
+Test  & 1002 & 153\,060 & 1\,579\,438 & 19{,}1~\% & Évaluation finale \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Imputation des valeurs manquantes.}
+Les features \texttt{delta\_commission} et \texttt{var\_agent\_split} présentent respectivement 5\,569\,643 et 4\,027\,625 valeurs manquantes dans l'ensemble d'entraînement. Ces NaN correspondent aux transactions pour lesquelles les indicateurs de smurfing et de fractionnement (éq.~3.13--3.14) ne sont pas définis. Ils sont remplacés par zéro avant tout traitement, valeur neutre sémantiquement correcte signifiant l'absence d'activité associée.
+
+\paragraph{Transformations logarithmiques.}
+Conformément au protocole du \texttt{TopologyValidator} (section~4.1), le test de Kolmogorov-Smirnov (éq.~4.5) est appliqué à chaque feature continue. Pour les features dont la distance $D_{KS} \geq 0{,}15$, la transformation suivante est appliquée :
+
+\begin{equation}
+    x'_{ij} = \log\!\left(1 + \max\!\bigl(x_{ij} - \min_{\mathrm{train}}(x_j),\; 0\bigr)\right)
+    \label{eq:logtransform}
+\end{equation}
+
+Le décalage $\min_{\mathrm{train}}(x_j)$ est calculé \textit{exclusivement sur le train}, puis réappliqué à la validation et au test pour éviter toute fuite de données. Sur les 12 features MKAN, 9 dépassent le seuil ($D_{KS} \in [0{,}37\,;\,0{,}54]$) : seule $\rho_{\text{nouveau}}$ (éq.~3.19) est exemptée ($D_{KS} = 0{,}13$), les deux features binaires (\texttt{flag\_anomalie}, \texttt{flag\_nuit}) étant ignorées par construction \citep{hou2024critical}.
+
+\paragraph{Normalisation z-score.}
+Après transformation logarithmique, les features sont standardisées :
+
+\begin{equation}
+    \tilde{x}_{ij} = \frac{x'_{ij} - \mu_j}{\sigma_j + \varepsilon}
+    \label{eq:zscore_impl}
+\end{equation}
+
+où $\mu_j$ et $\sigma_j$ sont la moyenne et l'écart-type de la feature $j$ calculés sur le train, et $\varepsilon = 10^{-6}$ assure la stabilité numérique. Les mêmes statistiques sont appliquées à la validation et au test, garantissant l'absence de contamination \citep{Li2024}.
+
+%--------------------------------------------------
+\subsection{Construction des fenêtres glissantes}
+\label{subsec:windows}
+%--------------------------------------------------
+
+Conformément à l'équation~4.16, le modèle MKAN opère sur des séquences temporelles de transactions par compte. Pour chaque compte \texttt{nameOrig}, les transactions sont ordonnées par pas de temps \texttt{step}, puis toutes les sous-séquences consécutives de $W$ transactions sont extraites :
+
+\begin{equation}
+    \mathbf{X}^{(k)}_t = \bigl(\tilde{x}_{t-W+1}^{(k)},\; \tilde{x}_{t-W+2}^{(k)},\; \ldots,\; \tilde{x}_t^{(k)}\bigr) \in \mathbb{R}^{W \times d}
+    \label{eq:window_impl}
+\end{equation}
+
+où $d = 12$ est la dimension des features et le label de la fenêtre est l'étiquette \texttt{isFraud} de la \textit{dernière} transaction $\tilde{x}_t^{(k)}$. Les comptes possédant moins de $W$ transactions sont exclus. Avec $W = 10$ pas de temps, le pipeline produit les volumes du tableau~\ref{tab:windows}.
+
+\begin{table}[h!]
+\centering
+\caption{Volumes de fenêtres glissantes ($W = 10$, par partition)}
+\label{tab:windows}
+\begin{tabular}{lrr}
+\hline
+\textbf{Partition} & \textbf{Fenêtres} & \textbf{Taux de fraude} \\
+\hline
+Train & 1\,749\,109 & 43{,}9~\% \\
+Val   &   450\,955  & 34{,}6~\% \\
+Test  &   452\,349  & 34{,}6~\% \\
+\hline
+\end{tabular}
+\end{table}
+
+Le taux de fraude des fenêtres est sensiblement supérieur à celui des transactions brutes (23,6~\% pour le train). Ce phénomène s'explique par le mécanisme de fenêtrage : une transaction frauduleuse en fin de séquence se retrouve dans les $W - 1$ fenêtres précédentes du même compte, augmentant mécaniquement la proportion d'étiquettes positives \citep{Zhou2025}.
+
+%--------------------------------------------------
+\subsection{Construction des DataLoaders}
+\label{subsec:dataloaders}
+%--------------------------------------------------
+
+Les tableaux NumPy issus de la fonction \texttt{make\_windows} sont convertis en tenseurs \texttt{float32} et encapsulés dans des \texttt{TensorDataset} PyTorch, puis exposés via des \texttt{DataLoader} configurés comme suit :
+
+\begin{itemize}
+    \item \textbf{Taille de lot} : 256 fenêtres par mini-lot, compromis entre la stabilité des gradients et l'occupation mémoire GPU.
+    \item \textbf{Mélange} : activé sur le train (\texttt{shuffle=True}) pour briser les corrélations temporelles intra-lot ; désactivé sur la validation et le test pour la reproductibilité des métriques.
+    \item \textbf{Travailleurs de chargement} : \texttt{num\_workers=0} --- le chargement est assuré par le fil principal afin d'éviter les conflits d'accès mémoire entre les processus de préchargement Python et le backend DirectML qui gère lui-même sa file de commandes GPU.
+\end{itemize}
+
+%--------------------------------------------------
+\subsection{Recherche heuristique des hyperparamètres}
+\label{subsec:heuristic_exec}
+%--------------------------------------------------
+
+La \texttt{RechercheHeuristique} (section~4.5) explore l'espace \texttt{ESPACE\_MKAN\_DEFAULT} composé de 7 hyperparamètres : la taille de l'état caché \texttt{hidden\_size}, le nombre de centres gaussiens $M$, l'ordre de Fourier $K$, la force de régularisation $\lambda$, les pondérations $\mu_1$ et $\mu_2$, et le taux d'apprentissage $\eta$. La taille de fenêtre $W = 10$ et la taille de lot sont fixes dans cette configuration.
+
+\paragraph{Sous-échantillonnage pour l'évaluation fitness.}
+Chaque évaluation de fitness consiste à entraîner un \texttt{MKANScorer} pendant $N_{\text{search}} = 10$ epochs et à calculer le MCC sur la validation. Avec 1\,749\,109 fenêtres d'entraînement, une évaluation complète serait prohibitive. Un sous-échantillonnage aléatoire reproductible (graine 42) réduit les volumes à $n_{\text{tr}} = 30\,000$ fenêtres train et $n_{\text{val}} = 10\,000$ fenêtres val, soit un facteur d'accélération d'environ $20\times$ par évaluation. Le budget total est borné par :
+
+\begin{equation}
+    B = N_{\text{gen}} \times T_{\text{pop}} \times N_{\text{search}}
+      = 15 \times 12 \times 10 = 1\,800\;\text{epochs de recherche}
+    \label{eq:budget}
+\end{equation}
+
+\paragraph{Paramètres de la recherche génétique.}
+La configuration retenue est résumée dans le tableau~\ref{tab:rech_config}. La mutation adaptative s'inspire du refroidissement simulé \citep{haosol2024meta} : le taux de mutation $r_t$ décroît géométriquement selon $r_t = r_0 \cdot \rho^t$ avec $\rho = 0{,}97$, mais est réinitialisé lorsque la diversité de la population tombe sous le seuil de 0{,}40, afin de prévenir la convergence prématurée vers un optimum local.
+
+\begin{table}[h!]
+\centering
+\caption{Configuration de la \texttt{RechercheHeuristique} (section~4.5)}
+\label{tab:rech_config}
+\begin{tabular}{ll}
+\hline
+\textbf{Paramètre} & \textbf{Valeur} \\
+\hline
+Générations ($N_{\text{gen}}$)      & 15 \\
+Taille de population ($T_{\text{pop}}$) & 12 \\
+Élite conservée                    & 2 individus \\
+Taille du tournoi                  & 3 individus \\
+Taux de mutation initial ($r_0$)   & 0{,}35 \\
+Facteur de refroidissement ($\rho$) & 0{,}97 par génération \\
+Seuil de diversité minimale        & 0{,}40 \\
+Patience (arrêt anticipé)          & 5 générations sans amélioration \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Warm start.}
+À l'issue de la recherche, les poids du meilleur individu sont récupérés et rechargés dans le modèle final avant l'entraînement complet. Cette stratégie de démarrage à chaud (\textit{warm start}) évite de repartir d'une initialisation aléatoire et économise au minimum $N_{\text{search}}$ epochs supplémentaires \citep{Zhu2025}.
+
+%--------------------------------------------------
+\subsection{Boucle d'entraînement finale}
+\label{subsec:training_loop}
+%--------------------------------------------------
+
+Le modèle \texttt{MKANScorer} est entraîné pendant $N_{\text{epoch}} = 40$ epochs sur l'intégralité des 1\,749\,109 fenêtres d'entraînement, avec les hyperparamètres sélectionnés par la recherche heuristique.
+
+\paragraph{Optimiseur et écrêtage des gradients.}
+L'optimiseur Adam est utilisé avec le taux d'apprentissage $\eta$ issu de la recherche (valeur de référence $\eta_0 = 10^{-3}$). Pour stabiliser la rétropropagation à travers les $W = 10$ pas de temps de la cellule T-KAN, les gradients sont écrêtés à la norme maximale 1 avant chaque mise à jour :
+
+\begin{equation}
+    \hat{g}_t = g_t \cdot \min\!\left(1,\; \frac{1}{\lVert g_t \rVert_2}\right)
+    \label{eq:clipgrad}
+\end{equation}
+
+\paragraph{Fonction de perte et passage avant optimisé.}
+La perte $\ell_{\text{total}}$ (section~4.3.4) est calculée à chaque mini-lot via \texttt{mkan\_total\_loss} avec $\lambda = 10^{-2}$, $\mu_1 = 1{,}0$, $\mu_2 = 0{,}5$. Les termes de régularisation $\sum_l |\Phi_l|_1$ et $\sum_l S(\Phi_l)$ sont accumulés sur les $W$ pas de temps au moyen de \texttt{forward\_with\_reg()}, qui calcule les activations d'arêtes $\phi_{ij}(x_i)$ une seule fois par porte et par pas de temps. Cette fusion divise par trois le nombre d'appels à \texttt{edge\_activations} par rapport à l'enchaînement naïf des trois opérations séparées (passage avant, norme L1, entropie), réduisant d'autant le coût du passage avant avec régularisation \citep{liu2024kan}.
+
+\paragraph{Sélection du meilleur point de contrôle.}
+À la fin de chaque epoch, le MCC est calculé sur l'ensemble de validation. Si ce score dépasse le meilleur observé, les poids courants sont sauvegardés :
+
+\begin{equation}
+    \theta^* = \underset{\theta_e,\; e \in \{1,\ldots,N_{\text{epoch}}\}}{\arg\max}\;
+               \mathrm{MCC}\!\bigl(f_{\theta_e}(\mathcal{D}_{\text{val}})\bigr)
+    \label{eq:bestckpt}
+\end{equation}
+
+Le MCC est préféré à la perte de validation comme critère de sélection car il est insensible au déséquilibre de classes (section~4.6.1) et directement aligné avec l'objectif opérationnel de détection de fraude \citep{azamuke2025rich}.
+
+%======================================================
 \part{Résultats et Interprétation}
 %======================================================
 
