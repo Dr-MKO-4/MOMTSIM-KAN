@@ -35,13 +35,13 @@ function Assert-Command($cmd) {
     }
 }
 
-# -- Prerequis ----------------------------------------------------------------
+# -- Prerequis -
 Assert-Command 'node'
 Assert-Command 'npm'
 Assert-Command 'python'
 Assert-Command 'pyinstaller'
 
-# -- 1. Build frontend React --------------------------------------------------
+# -- 1. Build frontend React --
 if (-not $SkipFrontend) {
     Write-Step '1/3 -- Build frontend React (Vite)'
     Push-Location (Join-Path $Root 'frontend')
@@ -53,7 +53,7 @@ if (-not $SkipFrontend) {
     Write-Host '  (frontend skippe)' -ForegroundColor Yellow
 }
 
-# -- 2. Bundle backend Python (PyInstaller) -----------------------------------
+# -- 2. Bundle backend Python (PyInstaller) --
 if (-not $SkipPyInstaller) {
     Write-Step '2/3 -- Bundle backend Python (PyInstaller)'
     Push-Location $Root
@@ -72,7 +72,7 @@ if (-not (Test-Path $BackendDir)) {
     exit 1
 }
 
-# -- 3. Build Electron + installeur NSIS -------------------------------------
+# -- 3. Build Electron + installeur NSIS -
 Write-Step '3/3 -- Build Electron + installeur NSIS'
 Push-Location (Join-Path $Root 'electron')
 npm install
@@ -81,7 +81,7 @@ npm run build
 if ($LASTEXITCODE -ne 0) { Write-Error 'electron-builder a echoue.'; exit 1 }
 Pop-Location
 
-# -- Resultat -----------------------------------------------------------------
+# -- Resultat --
 Write-Host ''
 Write-Host '=======================================' -ForegroundColor DarkGreen
 Write-Host '  BUILD TERMINE' -ForegroundColor Green

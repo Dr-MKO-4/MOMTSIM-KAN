@@ -1,5 +1,5 @@
 """
-MoMTSim-KAN — Réimplémentation Python/NumPy de MoMTSim
+MoMTSim-KAN  Réimplémentation Python/NumPy de MoMTSim
 adaptée aux 5 scénarios de fraude formalisés au Chapitre 3
 du mémoire (ATO, Refund Fraud, Fake Credentials, Split Deposit, Smurfing).
 
@@ -19,9 +19,9 @@ import json  # pour fraudScenariosConfig.yaml
 
 RNG = np.random.default_rng(1000)  # graine globale, remplaçable
 
-# ---------------------------------------------------------------------------
+# 
 # 1. UTILITAIRES (équivalents RandomCollection / BoundedArrayDeque)
-# ---------------------------------------------------------------------------
+# 
 
 class RandomCollection:
     """Tirage pondéré O(log n) via cumul de poids (équiv. NavigableMap Java)."""
@@ -49,9 +49,9 @@ class BoundedDeque(deque):
         super().__init__(maxlen=maxlen)
 
 
-# ---------------------------------------------------------------------------
+# 
 # 2. CHARGEMENT DES PARAMÈTRES (les 6 CSV MoMTSim + config fraude YAML)
-# ---------------------------------------------------------------------------
+# 
 
 @dataclass
 class ClientActionProfile:
@@ -139,9 +139,9 @@ class Parameters:
         return pool.next(rng) if pool else None
 
 
-# ---------------------------------------------------------------------------
+# 
 # 3. TRANSACTION
-# ---------------------------------------------------------------------------
+# 
 
 @dataclass
 class Transaction:
@@ -161,9 +161,9 @@ class Transaction:
     fraud_scenario: Optional[str] = None  # ATO / REFUND / FAKE_CRED / SPLIT_DEP / SMURFING
 
 
-# ---------------------------------------------------------------------------
+# 
 # 4. AGENTS
-# ---------------------------------------------------------------------------
+# 
 
 class ActorType(Enum):
     BANK = auto()
@@ -243,7 +243,7 @@ class Client(SuperActor):
         self.tx_history_amounts = deque(maxlen=10)  # pour Flag anomalie (µ+2σ glissant)
         self.recent_transfers = deque(maxlen=50)     # pour la règle de fraude native
 
-    # --- 3.3 Spring Model ---
+    #  3.3 Spring Model 
     def spring_probabilities(self):
         k = 1.0 / self.equilibrium
         spring_force = k * (self.equilibrium - self.balance)
@@ -252,14 +252,14 @@ class Client(SuperActor):
         new_prob_in = float(np.clip(new_prob_in, 0.0, 1.0))
         return new_prob_in, 1.0 - new_prob_in
 
-    # --- 3.1 nombre de transactions à ce step (binomiale) ---
+    #  3.1 nombre de transactions à ce step (binomiale) 
     def draw_tx_count(self, step_target_count: int, rng=RNG) -> int:
         if self.target_total_count <= 0 or step_target_count <= 0:
             return 0
         n = int(rng.binomial(step_target_count, min(1.0, self.client_weight)))
         return n
 
-    # --- 3.2 montant (loi normale, profil client + profil step) ---
+    #  3.2 montant (loi normale, profil client + profil step) 
     def draw_amount(self, action: str, step_profile: Optional[StepActionProfile], rng=RNG) -> float:
         prof = self.profiles.get(action)
         if prof is None:
@@ -274,7 +274,7 @@ class Client(SuperActor):
             amount = rng.normal(mu, max(sigma, 1e-6))
         return float(amount)
 
-    # --- 3.4 Stickiness ---
+    #  3.4 Stickiness 
     def pick_counterparty(self, candidate_pool: list[str], rng=RNG) -> str:
         if self.history and rng.uniform() < 0.90:
             return rng.choice(list(self.history))
@@ -283,7 +283,7 @@ class Client(SuperActor):
             self.remember(target)
         return target
 
-    # --- 3.6 règle de détection native ---
+    #  3.6 règle de détection native 
     def check_native_fraud_flag(self, amount: float, transfer_limit: float) -> bool:
         self.recent_transfers.append(amount)
         if len(self.recent_transfers) >= 3:
@@ -314,9 +314,9 @@ class Mule(Client):
         return self.withdraw(amount)
 
 
-# ---------------------------------------------------------------------------
-# 5. AGENTS FRAUDEURS — formules EXACTES de la section 3.2 du mémoire
-# ---------------------------------------------------------------------------
+# 
+# 5. AGENTS FRAUDEURS  formules EXACTES de la section 3.2 du mémoire
+# 
 
 class BaseFraudster:
     scenario_name = "BASE"
@@ -340,7 +340,7 @@ class BaseFraudster:
 
 
 class ATOFraudster(BaseFraudster):
-    """3.2.1 — Account Takeover : retraits massifs haute vélocité."""
+    """3.2.1  Account Takeover : retraits massifs haute vélocité."""
     scenario_name = "ATO"
 
     def __init__(self, cfg, params):
@@ -373,7 +373,7 @@ class ATOFraudster(BaseFraudster):
 
 
 class RefundFraudster(BaseFraudster):
-    """3.2.2 — Refund Fraud : boucles paiement/remboursement."""
+    """3.2.2  Refund Fraud : boucles paiement/remboursement."""
     scenario_name = "REFUND"
 
     def __init__(self, cfg, params):
@@ -406,7 +406,7 @@ class RefundFraudster(BaseFraudster):
 
 
 class FakeCredentialsFraudster(BaseFraudster):
-    """3.2.3 — Fake Credentials : dormance puis exfiltration."""
+    """3.2.3  Fake Credentials : dormance puis exfiltration."""
     scenario_name = "FAKE_CRED"
 
     def __init__(self, cfg, params):
@@ -425,7 +425,7 @@ class FakeCredentialsFraudster(BaseFraudster):
 
 
 class SplitDepositFraudster(BaseFraudster):
-    """3.2.4 — Split Deposit : arbitrage de commission par agent."""
+    """3.2.4  Split Deposit : arbitrage de commission par agent."""
     scenario_name = "SPLIT_DEP"
 
     def __init__(self, cfg, params):
@@ -461,7 +461,7 @@ class SplitDepositFraudster(BaseFraudster):
 
 
 class SmurfingNetwork(BaseFraudster):
-    """3.2.5 — Smurfing : réseau f1 -> mules -> f2, critères de Zhdanova et al."""
+    """3.2.5  Smurfing : réseau f1 -> mules -> f2, critères de Zhdanova et al."""
     scenario_name = "SMURFING"
 
     def __init__(self, cfg, params, emitter: SuperActor, receiver: SuperActor,

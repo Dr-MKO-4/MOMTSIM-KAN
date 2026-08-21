@@ -82,7 +82,7 @@ function DataTable({ data, fraudColIndex, onPageChange, loading = false }: Props
                       ].join(" ")}
                     >
                       {cell === null || cell === undefined
-                        ? <span className="text-text-dim">—</span>
+                        ? <span className="text-text-dim"></span>
                         : typeof cell === "number"
                           ? cell.toLocaleString("fr-FR")
                           : String(cell)}

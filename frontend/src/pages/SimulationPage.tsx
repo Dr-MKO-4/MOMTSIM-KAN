@@ -90,12 +90,12 @@ export default function SimulationPage() {
   return (
     <Layout
       title="Simulation MoMTSim"
-      subtitle="Génération du rawLog_torch.parquet — section 3.1 du mémoire"
+      subtitle="Génération du rawLog_torch.parquet  section 3.1 du mémoire"
     >
       {fromHistory && (
         <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-accent-blue/10 border border-accent-blue/25 text-xs text-accent-blue">
           <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-          Paramètres rechargés depuis l'historique — modifiez n_steps pour prolonger la simulation, puis relancez.
+          Paramètres rechargés depuis l'historique  modifiez n_steps pour prolonger la simulation, puis relancez.
         </div>
       )}
 
@@ -232,12 +232,12 @@ export default function SimulationPage() {
                 </div>
               )}
 
-              {/* Plotly charts — vue globale */}
+              {/* Plotly charts  vue globale */}
               {result.charts.volume_par_action && (
                 <PlotlyEmbed html={result.charts.volume_par_action} title="Volume par action et par step" />
               )}
               {result.charts.nrmse_heatmap && (
-                <PlotlyEmbed html={result.charts.nrmse_heatmap} title="NRMSE par action × estimateur — section 3.1.3" height={340} />
+                <PlotlyEmbed html={result.charts.nrmse_heatmap} title="NRMSE par action × estimateur  section 3.1.3" height={340} />
               )}
               {result.charts.repartition_fraude && (
                 <PlotlyEmbed html={result.charts.repartition_fraude} title="Répartition des scénarios de fraude" height={360} />
@@ -246,27 +246,27 @@ export default function SimulationPage() {
                 <PlotlyEmbed html={result.charts.timeline_fraude} title="Timeline des fraudes (720 steps = 30 jours)" />
               )}
               {result.charts.fraudster_summary && (
-                <PlotlyEmbed html={result.charts.fraudster_summary} title="Synthèse par scénario — section 3.2" height={420} />
+                <PlotlyEmbed html={result.charts.fraudster_summary} title="Synthèse par scénario  section 3.2" height={420} />
               )}
 
               {/* Conformité par scénario */}
               {result.charts.ato_exfiltration && (
-                <PlotlyEmbed html={result.charts.ato_exfiltration} title="ATO — fenêtre d'exfiltration (§3.2.1)" height={400} />
+                <PlotlyEmbed html={result.charts.ato_exfiltration} title="ATO  fenêtre d'exfiltration (§3.2.1)" height={400} />
               )}
               {result.charts.refund_delays && (
-                <PlotlyEmbed html={result.charts.refund_delays} title="REFUND — distribution des délais (§3.2.2)" height={400} />
+                <PlotlyEmbed html={result.charts.refund_delays} title="REFUND  distribution des délais (§3.2.2)" height={400} />
               )}
               {result.charts.fake_cred_dormance && (
-                <PlotlyEmbed html={result.charts.fake_cred_dormance} title="FAKE_CRED — périodes de dormance (§3.2.3)" height={400} />
+                <PlotlyEmbed html={result.charts.fake_cred_dormance} title="FAKE_CRED  périodes de dormance (§3.2.3)" height={400} />
               )}
               {result.charts.split_deposit_var && (
-                <PlotlyEmbed html={result.charts.split_deposit_var} title="SPLIT_DEP — variance intra-opération (§3.2.4)" height={400} />
+                <PlotlyEmbed html={result.charts.split_deposit_var} title="SPLIT_DEP  variance intra-opération (§3.2.4)" height={400} />
               )}
               {result.charts.smurfing_periodicity && (
-                <PlotlyEmbed html={result.charts.smurfing_periodicity} title="SMURFING — périodicité inter-opérations (§3.2.5)" height={400} />
+                <PlotlyEmbed html={result.charts.smurfing_periodicity} title="SMURFING  périodicité inter-opérations (§3.2.5)" height={400} />
               )}
               {result.charts.smurfing_sankey && (
-                <PlotlyEmbed html={result.charts.smurfing_sankey} title="SMURFING — réseau Sankey émetteur→mule→récepteur" height={520} />
+                <PlotlyEmbed html={result.charts.smurfing_sankey} title="SMURFING  réseau Sankey émetteur→mule→récepteur" height={520} />
               )}
             </div>
           ) : (

@@ -82,7 +82,7 @@ export default function DashboardPage() {
   return (
     <Layout
       title="MoMTSim-KAN Dashboard"
-      subtitle="Pipeline de simulation de fraude Mobile Money — CEMAC/Cameroun"
+      subtitle="Pipeline de simulation de fraude Mobile Money  CEMAC/Cameroun"
     >
       {/* ── Pipeline ───────────────────────────────────────────────────── */}
       <section className="mb-6" aria-labelledby="pipeline-title">

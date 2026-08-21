@@ -1,6 +1,6 @@
 "use strict";
 /**
- * main.js — Electron main process for MoMTSim.
+ * main.js  Electron main process for MoMTSim.
  *
  * Flow:
  *  1. Show a splash screen immediately
@@ -147,7 +147,7 @@ app.whenReady().then(async () => {
   } catch (err) {
     killBackend();
     dialog.showErrorBox(
-      "MoMTSim — Erreur de démarrage",
+      "MoMTSim  Erreur de démarrage",
       `Le serveur Python n'a pas pu démarrer.\n\n${err.message}\n\n` +
       "Vérifiez que le port 8765 n'est pas déjà utilisé."
     );

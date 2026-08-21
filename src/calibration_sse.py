@@ -1,5 +1,5 @@
 """
-calibration_sse.py — Calibration SSE/SPSA (section 3.1.3 du mémoire).
+calibration_sse.py  Calibration SSE/SPSA (section 3.1.3 du mémoire).
 Minimise θ* = argmin Σ_c Σ_t (Dr(c,t) - Ds(c,t;θ))² par SPSA.
 Utilise le pipeline torch (TorchParameters + TorchMoMTSimEngine + TorchFraudInjector).
 """
@@ -37,7 +37,7 @@ class SSEFraudCalibrator:
         self._Dr_scale = 1.0
         self._params_cache = None
 
-    # ------------------------------------------------------------------
+    # 
     def _get_params(self) -> TorchParameters:
         if self._params_cache is None:
             self._params_cache = TorchParameters(
@@ -45,12 +45,12 @@ class SSEFraudCalibrator:
                 n_clients=self.n_clients, seed=self.seed)
         return self._params_cache
 
-    # ------------------------------------------------------------------
+    # 
     def _build_target_distribution(self, params: TorchParameters) -> np.ndarray:
         """Dr(c,t) : distribution cible par scénario (5) x bin (n_bins).
         Les 5 scénarios se partagent équitablement le taux cible (section 3.1.1).
         FAKE_CRED ne peut atteindre sa cible (pool=200, dormance 7-30j) : le SPSA
-        pousse p_fake_cred vers sa borne haute (0.3) pour maximiser son output — le
+        pousse p_fake_cred vers sa borne haute (0.3) pour maximiser son output  le
         scénario reste actif et contribue à ~0.3 activations/step en régime permanent."""
         legit_per_step = params.step_target_count.cpu().numpy()
         n_steps_used = self.n_bins * self.bin_size
@@ -61,13 +61,13 @@ class SSEFraudCalibrator:
         fraud_ratio = self.target_mid / (1 - self.target_mid)
         fraud_total_per_bin = legit_per_bin * fraud_ratio
 
-        # 5 scénarios actifs — répartition équitable
+        # 5 scénarios actifs  répartition équitable
         Dr = np.zeros((len(self.SCENARIOS), self.n_bins))
         for i in range(len(self.SCENARIOS)):
             Dr[i, :] = fraud_total_per_bin / len(self.SCENARIOS)
         return Dr  # shape (5, n_bins)
 
-    # ------------------------------------------------------------------
+    # 
     def _run_trial_binned(self, theta: np.ndarray, seed_offset: int,
                           cancel_check=None) -> "np.ndarray | None":
         """Exécute un run complet et retourne Ds(c,t;θ) : compte de tx frauduleuses
@@ -126,7 +126,7 @@ class SSEFraudCalibrator:
                 Ds[i, :] = counts[:self.n_bins]
         return Ds
 
-    # ------------------------------------------------------------------
+    # 
     def _objective(self, theta: np.ndarray, cancel_check=None) -> "float | None":
         theta = np.clip(theta, 1e-4, None)
         Ds_list = []
@@ -136,16 +136,16 @@ class SSEFraudCalibrator:
                 return None  # annulé pendant un trial
             Ds_list.append(ds)
         Ds_mean = np.mean(Ds_list, axis=0)
-        # Normalisation par Dr.sum() — gradient invariant à l'échelle du multiplicateur k = n_mules.
+        # Normalisation par Dr.sum()  gradient invariant à l'échelle du multiplicateur k = n_mules.
         # Sans normalisation, le gradient est O(k² × Dr²) ≈ 10^10 avec k=300,
         # ce qui rend lr=0.05 inutilisable (step >> espace des paramètres).
         sse = float(np.sum(((self._Dr - Ds_mean) / self._Dr_scale) ** 2))
         return sse
 
-    # ------------------------------------------------------------------
+    # 
     def calibrate(self, x0=None, maxiter=25, lr=0.05, spsa_c=0.02, verbose=True, cancel_check=None) -> dict:
         """SPSA : deux évaluations par itération suffisent à estimer un gradient
-        approché, quel que soit le nombre de paramètres — adapté à une simulation
+        approché, quel que soit le nombre de paramètres  adapté à une simulation
         bruitée et non différentiable (section 3.1.3)."""
         params = self._get_params()
         self._Dr = self._build_target_distribution(params)

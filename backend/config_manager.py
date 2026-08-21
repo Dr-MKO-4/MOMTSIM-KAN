@@ -1,5 +1,5 @@
 """
-backend/config_manager.py — Lecture / écriture / backup du fichier fraudScenariosConfig.json.
+backend/config_manager.py  Lecture / écriture / backup du fichier fraudScenariosConfig.json.
 """
 
 from __future__ import annotations

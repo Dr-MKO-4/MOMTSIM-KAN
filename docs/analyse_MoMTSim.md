@@ -1,9 +1,9 @@
 # Analyse complète du projet MoMTSim
 
 > Simulateur multi-agents de transactions de mobile money avec génération de fraudes synthétiques.  
-> Langage : Java — Moteur de simulation : MASON — Données cibles : contexte africain (monnaie mobile)
+> Langage : Java  Moteur de simulation : MASON  Données cibles : contexte africain (monnaie mobile)
 
----
+
 
 ## Table des matières
 
@@ -18,7 +18,7 @@
 9. [Production des résultats](#9-production-des-résultats)
 10. [Décomposition classe par classe](#10-décomposition-classe-par-classe)
 
----
+
 
 ## 1. Vue d'ensemble
 
@@ -28,34 +28,34 @@ Le programme génère un fichier CSV contenant des centaines de milliers de tran
 
 La simulation fonctionne sur **720 pas de temps** (720 heures = 30 jours) pendant lesquels des milliers d'agents (clients, marchands, banques, fraudeurs) interagissent selon des règles probabilistes calées sur des données réelles.
 
----
+
 
 ## 2. Architecture du projet
 
 Le code est organisé en sept packages Java :
 
-### `org.momtsim` — Cœur de la simulation
+### `org.momtsim`  Cœur de la simulation
 Contient le point d'entrée (`MoMTSimApp`), la classe d'état de la simulation (`MoMTSimState`) et une variante itérative (`IteratingMoMTSim`) qui expose les transactions comme un flux Java.
 
-### `org.momtsim.actors` — Les agents
+### `org.momtsim.actors`  Les agents
 Toutes les entités qui peuplent la simulation : clients, marchands, banques, fraudeurs, mules. Chaque agent qui agit de façon autonome implémente l'interface `Steppable` de MASON, ce qui signifie qu'il possède une méthode `step()` appelée à chaque pas de temps.
 
-### `org.momtsim.base` — Objets métier fondamentaux
+### `org.momtsim.base`  Objets métier fondamentaux
 La classe `Transaction` (enregistrement d'une opération) et les classes de profil comportemental (`ClientProfile`, `ClientActionProfile`, `StepActionProfile`).
 
-### `org.momtsim.identity` — Gestion des identités
+### `org.momtsim.identity`  Gestion des identités
 Fabrique et représentation des identités des acteurs (noms, e-mails, numéros de téléphone, identifiants) générées via la bibliothèque `jFairy`.
 
-### `org.momtsim.parameters` — Chargement de la configuration
+### `org.momtsim.parameters`  Chargement de la configuration
 Lecture du fichier `.properties` et des six fichiers CSV de paramètres. Ces classes transforment les données brutes en objets utilisables par la simulation.
 
-### `org.momtsim.output` — Export des résultats
+### `org.momtsim.output`  Export des résultats
 Écriture des fichiers de sortie : log brut de toutes les transactions, statistiques agrégées par heure, résumé des fraudeurs, métriques d'erreur (NRMSE).
 
-### `org.momtsim.utils` — Utilitaires
+### `org.momtsim.utils`  Utilitaires
 Lecture CSV, sélection aléatoire pondérée (`RandomCollection`), file bornée (`BoundedArrayDeque`), accès base de données MySQL optionnel, et utilitaires de graphe pour le module réseau de drogue (désactivé).
 
----
+
 
 ## 3. Le modèle mathématique
 
@@ -106,7 +106,7 @@ nouvelleProbEntrée = 0.5 × (1 + correctionStrength × springForce + (probEntr�
 
 Le résultat est borné entre 0 et 1, puis appliqué en facteur multiplicatif sur les probabilités brutes pour les recaler.
 
-### 3.4 Stickiness — fidélité aux marchands et aux clients connus
+### 3.4 Stickiness  fidélité aux marchands et aux clients connus
 
 Lorsqu'un client doit choisir un marchand ou un autre client pour une transaction :
 - Avec une probabilité de **90 %**, il réutilise un acteur avec lequel il a déjà interagi (liste des 100 derniers)
@@ -118,7 +118,7 @@ Lorsqu'un client doit choisir un marchand ou un autre client pour une transactio
 Chaque client dispose d'un **solde initial** tiré d'une distribution empirique (67 % des clients commencent avec 0–99 unités). La limite de découvert autorisée dépend du montant moyen des transactions du client :
 
 | Plage de montant moyen | Limite de découvert |
-|------------------------|---------------------|
+|||
 | < 0                    | 0                   |
 | 0 – 50 000             | −25 000             |
 | 50 000 – 100 000       | −75 000             |
@@ -139,11 +139,11 @@ ET que (soldeMax - soldeCourant - montant) > transferLimit × 2,5
 
 La limite de transfert par défaut est 5 000 000 unités.
 
----
+
 
 ## 4. Les types de fraude
 
-### 4.1 Third Party Fraud (fraude tiers — compte compromis)
+### 4.1 Third Party Fraud (fraude tiers  compte compromis)
 
 C'est la fraude principale, active par défaut avec une probabilité de **80 %** par pas de temps.
 
@@ -152,13 +152,13 @@ Le fraudeur possède :
 - Deux **marchands favoris** marqués à haut risque (il a compromis leur terminal)
 
 À chaque pas de temps, il procède ainsi :
-1. Il sélectionne une victime — de préférence un client qui fréquente ses marchands compromis, sinon un client aléatoire
+1. Il sélectionne une victime  de préférence un client qui fréquente ses marchands compromis, sinon un client aléatoire
 2. Il effectue un **paiement test** (PAYMENT) d'environ 25 % du montant moyen de la victime, pour vérifier que le compte est accessible
 3. Si le paiement réussit, il effectue un **transfert** (TRANSFER) vers sa mule, également pour environ 25 % du montant moyen
 4. Ce transfert est marqué frauduleux avec une probabilité de 30 %
 5. Avec une probabilité de 30 %, la mule effectue ensuite un **retrait en espèces** (CASH_OUT) frauduleux
 
-### 4.2 First Party Fraud (fraude interne — fausse identité)
+### 4.2 First Party Fraud (fraude interne  fausse identité)
 
 Activée avec la probabilité `firstPartyFraudProbability` (réglée à 0 par défaut, donc inactive dans la configuration standard).
 
@@ -176,7 +176,7 @@ Enchaîne un paiement marchand et un transfert pour simuler un schéma de rembou
 
 Fractionne une somme en 1 à 10 petits dépôts CASH_IN vers le même marchand, stratégie cherchant à passer sous les seuils de détection. Tous ces dépôts sont marqués frauduleux.
 
----
+
 
 ## 5. Flux d'exécution principal
 
@@ -211,7 +211,7 @@ Une fois les 720 pas écoulés :
 - La distribution des profils clients est exportée
 - Un résumé des erreurs (NRMSE) comparant les statistiques simulées aux données cibles est calculé et sauvegardé
 
----
+
 
 ## 6. Les paramètres d'entrée
 
@@ -220,7 +220,7 @@ Une fois les 720 pas écoulés :
 Ce fichier texte centralise toute la configuration :
 
 | Paramètre | Valeur par défaut | Signification |
-|-----------|-------------------|---------------|
+|--|-||
 | `seed` | 1000 | Graine du générateur de nombres aléatoires |
 | `nbSteps` | 720 | Nombre de pas de temps (heures) |
 | `multiplier` | 1 | Facteur de mise à l'échelle de la population |
@@ -239,23 +239,23 @@ La graine peut être réglée sur `"time"` pour utiliser l'horloge système, ren
 
 ### Fichiers CSV dans `paramFiles/`
 
-**`transactionsTypes.csv`** — Liste les six types d'actions valides : CASH_IN, CASH_OUT, DEBIT, PAYMENT, TRANSFER, DEPOSIT.
+**`transactionsTypes.csv`**  Liste les six types d'actions valides : CASH_IN, CASH_OUT, DEBIT, PAYMENT, TRANSFER, DEPOSIT.
 
-**`clientsProfiles.csv`** — Décrit la distribution des comportements clients. Pour chaque type d'action, il y a plusieurs profils possibles, chacun avec un nombre minimum et maximum de transactions par mois, un montant moyen, un écart-type, et un poids de fréquence. Exemple : un profil CASH_IN prévoit entre 10 et 99 transactions avec un montant moyen de 72 111 unités.
+**`clientsProfiles.csv`**  Décrit la distribution des comportements clients. Pour chaque type d'action, il y a plusieurs profils possibles, chacun avec un nombre minimum et maximum de transactions par mois, un montant moyen, un écart-type, et un poids de fréquence. Exemple : un profil CASH_IN prévoit entre 10 et 99 transactions avec un montant moyen de 72 111 unités.
 
-**`aggregatedTransactions.csv`** — Donne le nombre attendu de transactions, la somme, la moyenne et l'écart-type par type d'action et par heure sur 30 jours. C'est la "vérité terrain" que la simulation cherche à reproduire.
+**`aggregatedTransactions.csv`**  Donne le nombre attendu de transactions, la somme, la moyenne et l'écart-type par type d'action et par heure sur 30 jours. C'est la "vérité terrain" que la simulation cherche à reproduire.
 
-**`initialBalancesDistribution.csv`** — Décrit la distribution des soldes initiaux des clients en tranches. 67,14 % des clients commencent avec un solde entre 0 et 99 unités.
+**`initialBalancesDistribution.csv`**  Décrit la distribution des soldes initiaux des clients en tranches. 67,14 % des clients commencent avec un solde entre 0 et 99 unités.
 
-**`overdraftLimits.csv`** — Associe une plage de montant moyen de transaction à une limite de découvert (montant négatif maximal autorisé).
+**`overdraftLimits.csv`**  Associe une plage de montant moyen de transaction à une limite de découvert (montant négatif maximal autorisé).
 
-**`maxOccurrencesPerClient.csv`** — Nombre maximum de transactions de chaque type qu'un client peut effectuer sur toute la simulation.
+**`maxOccurrencesPerClient.csv`**  Nombre maximum de transactions de chaque type qu'un client peut effectuer sur toute la simulation.
 
----
+
 
 ## 7. Les agents et leurs comportements
 
-### SuperActor — la classe de base
+### SuperActor  la classe de base
 
 Tous les agents héritent de `SuperActor`. Cette classe fournit :
 - Un **solde** (`balance`) et une **limite de découvert** (`overdraftLimit`)
@@ -263,7 +263,7 @@ Tous les agents héritent de `SuperActor`. Cette classe fournit :
 - Un **historique des 100 derniers clients** avec lesquels l'acteur a interagi (file bornée)
 - Un énuméré `Type` : BANK, CLIENT, FIRST_PARTY_FRAUDSTER, THIRD_PARTY_FRAUDSTER, MERCHANT, MULE
 
-### Client — l'agent central
+### Client  l'agent central
 
 C'est l'agent qui génère la grande majorité des transactions. À chaque pas de temps, il :
 1. Calcule son nombre de transactions via la loi binomiale
@@ -274,27 +274,27 @@ C'est l'agent qui génère la grande majorité des transactions. À chaque pas d
 
 Le client possède un profil comportemental qui définit la distribution de ses types de transactions, et un poids (`clientWeight`) qui détermine à quelle fréquence il est "tiré au sort" pour agir.
 
-### Merchant — agent passif
+### Merchant  agent passif
 
 Un marchand reçoit des paiements, des dépôts et des retraits mais n'initie rien. Il est simplement une destination dans les transactions. Il peut être marqué "à haut risque", ce qui signifie que les fraudeurs le ciblent préférentiellement.
 
-### Bank — agent passif
+### Bank  agent passif
 
 Une banque reçoit des débits et des dépôts directs. Comportement identique au marchand, seulement passif.
 
-### Mule — compte fantoche
+### Mule  compte fantoche
 
-Une mule étend la classe Client mais sa méthode `step()` ne fait rien — elle est inerte dans la simulation normale. Son seul rôle actif est la méthode `fraudulentCashOut()`, appelée par le fraudeur qui la contrôle pour retirer l'argent transféré illicitement.
+Une mule étend la classe Client mais sa méthode `step()` ne fait rien  elle est inerte dans la simulation normale. Son seul rôle actif est la méthode `fraudulentCashOut()`, appelée par le fraudeur qui la contrôle pour retirer l'argent transféré illicitement.
 
-### ThirdPartyFraudster — fraudeur externe
+### ThirdPartyFraudster  fraudeur externe
 
 C'est le fraudeur le plus actif. Il maintient une liste de victimes et deux marchands compromis. À chaque pas de temps, il tente une séquence paiement-test → transfert → retrait selon les probabilités décrites dans la section fraude.
 
-### FirstPartyFraudster — fraudeur interne
+### FirstPartyFraudster  fraudeur interne
 
 Inactif par défaut. Lorsqu'il agit, il génère de fausses identités composites (mix de données volées à trois personnes réelles) et crée des comptes mules pour blanchir des fonds.
 
----
+
 
 ## 8. Structures de données clés
 
@@ -316,7 +316,7 @@ Un objet immuable (dans les faits) qui capture l'état complet d'une opération 
 
 Une liste de 720 maps, une par heure. Chaque map associe un type d'action à son profil pour cette heure (nombre cible, somme, moyenne, écart-type). C'est la carte de référence que la simulation cherche à reproduire statistiquement.
 
----
+
 
 ## 9. Production des résultats
 
@@ -324,17 +324,17 @@ Une liste de 720 maps, une par heure. Chaque map associe un type d'action à son
 
 Tous les fichiers sont écrits dans `outputs/MoMTSim_<timestamp>_<seed>/` :
 
-**`rawLog.csv`** — Le fichier principal. Chaque ligne est une transaction avec les colonnes : step, action, amount, nameOrig, oldBalanceOrig, newBalanceOrig, nameDest, oldBalanceDest, newBalanceDest, isFraud. C'est ce fichier qui sera utilisé pour entraîner un modèle de détection.
+**`rawLog.csv`**  Le fichier principal. Chaque ligne est une transaction avec les colonnes : step, action, amount, nameOrig, oldBalanceOrig, newBalanceOrig, nameDest, oldBalanceDest, newBalanceDest, isFraud. C'est ce fichier qui sera utilisé pour entraîner un modèle de détection.
 
-**`aggregatedTransactions.csv`** — Statistiques par heure et par type d'action (count, sum, avg, std), permettant de comparer le comportement simulé aux données cibles.
+**`aggregatedTransactions.csv`**  Statistiques par heure et par type d'action (count, sum, avg, std), permettant de comparer le comportement simulé aux données cibles.
 
-**`fraudsters.csv`** — Résumé par fraudeur : nom, type, nombre de victimes, liste des victimes, profit total.
+**`fraudsters.csv`**  Résumé par fraudeur : nom, type, nombre de victimes, liste des victimes, profit total.
 
-**`clientsProfiles.csv`** — Distribution des profils comportementaux attribués aux clients.
+**`clientsProfiles.csv`**  Distribution des profils comportementaux attribués aux clients.
 
-**`MoMTSim.properties`** (copie) — Paramètres utilisés pour cette exécution, pour la traçabilité.
+**`MoMTSim.properties`** (copie)  Paramètres utilisés pour cette exécution, pour la traçabilité.
 
-**`Summary.txt`** — Métriques de qualité de la simulation.
+**`Summary.txt`**  Métriques de qualité de la simulation.
 
 ### Métriques de qualité : le NRMSE
 
@@ -351,7 +351,7 @@ Plus le NRMSE est proche de 0, plus la simulation est fidèle aux données histo
 
 Pour ne pas accumuler toutes les transactions en mémoire, les fichiers sont écrits pas à pas en mode append. À la fin de chaque pas de temps, les transactions de cette heure sont écrites puis supprimées de la liste en mémoire.
 
----
+
 
 ## 10. Décomposition classe par classe
 
@@ -366,104 +366,104 @@ Classe abstraite héritant de `SimState` (MASON). Maintient les listes de tous l
 **`IteratingMoMTSim`**  
 Alternative à `MoMTSimApp` pour un usage en flux. La simulation tourne dans un thread séparé (`SimulationWorker`) et place les transactions dans une `BlockingQueue` de 200 000 places. La classe implémente `Iterator<Transaction>`, permettant à un consommateur externe de traiter les transactions une par une au fil de leur génération.
 
----
+
 
 ### Package `org.momtsim.actors`
 
-**`SuperActor`** — Base abstraite de tous les agents. Gère solde, découvert, historique.
+**`SuperActor`**  Base abstraite de tous les agents. Gère solde, découvert, historique.
 
-**`Client`** — Agent actif principal. Implémente la logique de tirage binomial, spring model, stickiness, et dispatch des six types de transactions.
+**`Client`**  Agent actif principal. Implémente la logique de tirage binomial, spring model, stickiness, et dispatch des six types de transactions.
 
-**`Merchant`** — Agent passif. Possède une identité et un drapeau `highRisk`.
+**`Merchant`**  Agent passif. Possède une identité et un drapeau `highRisk`.
 
-**`Bank`** — Agent passif. Reçoit débits et dépôts.
+**`Bank`**  Agent passif. Reçoit débits et dépôts.
 
-**`Mule`** — Sous-classe de `Client` avec `step()` vide. Méthode active : `fraudulentCashOut()`.
+**`Mule`**  Sous-classe de `Client` avec `step()` vide. Méthode active : `fraudulentCashOut()`.
 
-**`FirstPartyFraudster`** — Crée des identités composites frauduleuses et des mules. Inactif par défaut.
+**`FirstPartyFraudster`**  Crée des identités composites frauduleuses et des mules. Inactif par défaut.
 
-**`ThirdPartyFraudster`** — Agent fraudeur principal : sélectionne victimes, enchaîne PAYMENT + TRANSFER, déclenche le cash-out de sa mule.
+**`ThirdPartyFraudster`**  Agent fraudeur principal : sélectionne victimes, enchaîne PAYMENT + TRANSFER, déclenche le cash-out de sa mule.
 
-**`DirectDepositFraudster`** — Variante : remplace le PAYMENT par un CASH_IN.
+**`DirectDepositFraudster`**  Variante : remplace le PAYMENT par un CASH_IN.
 
-**`RefundFraudster`** — Variante : simule un schéma de remboursement frauduleux.
+**`RefundFraudster`**  Variante : simule un schéma de remboursement frauduleux.
 
-**`SplitDepositFraudster`** — Variante : fractionne un montant en 1 à 10 petits CASH_IN.
+**`SplitDepositFraudster`**  Variante : fractionne un montant en 1 à 10 petits CASH_IN.
 
----
+
 
 ### Package `org.momtsim.base`
 
-**`Transaction`** — Enregistrement complet d'une opération : step, action, montant, identité + soldes avant/après des deux parties, quatre drapeaux booléens.
+**`Transaction`**  Enregistrement complet d'une opération : step, action, montant, identité + soldes avant/après des deux parties, quatre drapeaux booléens.
 
-**`ClientProfile`** — Profil comportemental d'un client : map action → `ClientActionProfile`, probabilités d'action calculées, nombre total de transactions cible.
+**`ClientProfile`**  Profil comportemental d'un client : map action → `ClientActionProfile`, probabilités d'action calculées, nombre total de transactions cible.
 
-**`ClientActionProfile`** — Profil pour une action spécifique : plage de nombre de transactions, montant moyen et écart-type.
+**`ClientActionProfile`**  Profil pour une action spécifique : plage de nombre de transactions, montant moyen et écart-type.
 
-**`StepActionProfile`** — Profil d'une heure pour une action donnée : count, sum, avg, std, mois/jour/heure.
+**`StepActionProfile`**  Profil d'une heure pour une action donnée : count, sum, avg, std, mois/jour/heure.
 
----
+
 
 ### Package `org.momtsim.parameters`
 
-**`Parameters`** — Lit `MoMTSim.properties` et instancie toutes les sous-classes de paramètres. Gère `seed="time"` en convertissant l'horloge système.
+**`Parameters`**  Lit `MoMTSim.properties` et instancie toutes les sous-classes de paramètres. Gère `seed="time"` en convertissant l'horloge système.
 
-**`ActionTypes`** — Classe statique. Charge les types d'actions valides et les occurrences maximales par client.
+**`ActionTypes`**  Classe statique. Charge les types d'actions valides et les occurrences maximales par client.
 
-**`ClientsProfiles`** — Charge `clientsProfiles.csv`. Pour chaque action, maintient une `RandomCollection` permettant de tirer un profil proportionnellement à sa fréquence.
+**`ClientsProfiles`**  Charge `clientsProfiles.csv`. Pour chaque action, maintient une `RandomCollection` permettant de tirer un profil proportionnellement à sa fréquence.
 
-**`StepsProfiles`** — Charge `aggregatedTransactions.csv`. Construit la liste des 720 profils horaires, calcule les probabilités d'action par étape et le nombre cible total de transactions.
+**`StepsProfiles`**  Charge `aggregatedTransactions.csv`. Construit la liste des 720 profils horaires, calcule les probabilités d'action par étape et le nombre cible total de transactions.
 
-**`BalancesClients`** — Classes statiques. Charge les distributions de soldes initiaux et de découverts. Expose `pickNextBalance()` et `getOverdraftLimit(meanTx)`.
+**`BalancesClients`**  Classes statiques. Charge les distributions de soldes initiaux et de découverts. Expose `pickNextBalance()` et `getOverdraftLimit(meanTx)`.
 
----
+
 
 ### Package `org.momtsim.output`
 
-**`Output`** — Classe statique avec toutes les méthodes d'écriture fichier. Initialise les noms de fichiers à la création de la simulation, puis les méthodes `incrementalWrite*` sont appelées à chaque pas et les méthodes `write*` à la clôture.
+**`Output`**  Classe statique avec toutes les méthodes d'écriture fichier. Initialise les noms de fichiers à la création de la simulation, puis les méthodes `incrementalWrite*` sont appelées à chaque pas et les méthodes `write*` à la clôture.
 
-**`Aggregator`** — Calcule les statistiques agrégées (sum, count, avg, std avec correction de Bessel) à partir d'une liste de transactions, filtrées par action et en excluant les transactions échouées.
+**`Aggregator`**  Calcule les statistiques agrégées (sum, count, avg, std avec correction de Bessel) à partir d'une liste de transactions, filtrées par action et en excluant les transactions échouées.
 
-**`SummaryBuilder`** — Calcule le NRMSE en comparant les séries temporelles simulées aux séries cibles pour chaque action et chaque estimateur statistique.
+**`SummaryBuilder`**  Calcule le NRMSE en comparant les séries temporelles simulées aux séries cibles pour chaque action et chaque estimateur statistique.
 
----
+
 
 ### Package `org.momtsim.identity`
 
-**`IdentityFactory`** — Utilise `jFairy` pour générer des noms, e-mails, SSN et numéros de téléphone réalistes. Maintient des ensembles de numéros déjà utilisés pour garantir l'unicité.
+**`IdentityFactory`**  Utilise `jFairy` pour générer des noms, e-mails, SSN et numéros de téléphone réalistes. Maintient des ensembles de numéros déjà utilisés pour garantir l'unicité.
 
-**`Identity`** — Classe abstraite : id + name.
+**`Identity`**  Classe abstraite : id + name.
 
-**`ClientIdentity`** — Ajoute email, SSN, phoneNumber. Méthode `replaceProperty()` pour créer des identités composites (fraude premier parti).
+**`ClientIdentity`**  Ajoute email, SSN, phoneNumber. Méthode `replaceProperty()` pour créer des identités composites (fraude premier parti).
 
-**`MerchantIdentity`** — Ajoute le drapeau `highRisk`.
+**`MerchantIdentity`**  Ajoute le drapeau `highRisk`.
 
-**`BankIdentity`** — Préfixe l'identifiant avec "B".
+**`BankIdentity`**  Préfixe l'identifiant avec "B".
 
----
+
 
 ### Package `org.momtsim.utils`
 
-**`RandomCollection<E>`** — Sélection pondérée en O(log n) via `NavigableMap` à poids cumulatifs.
+**`RandomCollection<E>`**  Sélection pondérée en O(log n) via `NavigableMap` à poids cumulatifs.
 
-**`BoundedArrayDeque<T>`** — File bornée à 100 éléments par défaut.
+**`BoundedArrayDeque<T>`**  File bornée à 100 éléments par défaut.
 
-**`CSVReader`** — Lecture simple de fichiers CSV : ignore l'en-tête, split par virgule.
+**`CSVReader`**  Lecture simple de fichiers CSV : ignore l'en-tête, split par virgule.
 
-**`DatabaseHandler`** — Insert optionnel dans MySQL via JDBC. Activé si `saveToDB=1` dans les propriétés.
+**`DatabaseHandler`**  Insert optionnel dans MySQL via JDBC. Activé si `saveToDB=1` dans les propriétés.
 
-**`GraphUtils`** — Utilitaires TinkerGraph pour charger le réseau de trafic de drogue (module désactivé).
+**`GraphUtils`**  Utilitaires TinkerGraph pour charger le réseau de trafic de drogue (module désactivé).
 
----
+
 
 ### Package `org.momtsim.actors.networkdrugs` (désactivé)
 
-**`NetworkDrug`** — Charge un graphe XML (`DrugNetworkOne.graphml`) et crée des agents `DrugDealer` et `DrugConsumer` selon la topologie du réseau.
+**`NetworkDrug`**  Charge un graphe XML (`DrugNetworkOne.graphml`) et crée des agents `DrugDealer` et `DrugConsumer` selon la topologie du réseau.
 
-**`DrugDealer`** — Étend `Client`. Accumule de l'argent de drogue dans un compteur séparé et effectue un retrait en espèces quand le seuil est atteint.
+**`DrugDealer`**  Étend `Client`. Accumule de l'argent de drogue dans un compteur séparé et effectue un retrait en espèces quand le seuil est atteint.
 
-**`DrugConsumer`** — Étend `Client`. Calcule une probabilité d'achat basée sur ses dépenses mensuelles et le montant moyen des transactions. Effectue un transfert vers son dealer quand il souhaite acheter.
+**`DrugConsumer`**  Étend `Client`. Calcule une probabilité d'achat basée sur ses dépenses mensuelles et le montant moyen des transactions. Effectue un transfert vers son dealer quand il souhaite acheter.
 
----
+
 
 *Ce module réseau de drogue est présent dans le code mais n'est jamais instancié dans la simulation principale. Il était probablement prévu pour une extension du projet.*

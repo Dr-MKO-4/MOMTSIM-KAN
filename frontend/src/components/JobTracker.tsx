@@ -72,7 +72,7 @@ export default function JobTracker({ jobId, onDone, onError, onStop, onRestart }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId]);
 
-  /* Elapsed timer — ticks only while pending/running */
+  /* Elapsed timer  ticks only while pending/running */
   useEffect(() => {
     if (!job || job.status === "done" || job.status === "error") return;
     const id = setInterval(() => {

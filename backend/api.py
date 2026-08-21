@@ -1,5 +1,5 @@
 """
-backend/api.py — FastAPI app MoMTSim-KAN.
+backend/api.py  FastAPI app MoMTSim-KAN.
 
 Endpoints :
   GET  /api/config                 → lire fraudScenariosConfig.json
@@ -55,9 +55,9 @@ app.add_middleware(
 )
 
 
-# ---------------------------------------------------------------------------
+# 
 # Config
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/config", tags=["config"])
 def get_config():
@@ -90,9 +90,9 @@ def restore_backup(backup_name: str):
         raise HTTPException(404, str(e))
 
 
-# ---------------------------------------------------------------------------
+# 
 # Sim config (sim_config.json)
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/sim-config", tags=["config"])
 def get_sim_config():
@@ -106,9 +106,9 @@ def put_sim_config(params: SimulationParams):
     return {"saved": path}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Calib config (calib_config.json)
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/calib-config", tags=["calibration"])
 def get_calib_config():
@@ -121,9 +121,9 @@ def put_calib_config(params: CalibrationParams):
     return {"saved": path}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Probas calibrées
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/probas", tags=["calibration"])
 def get_calibrated_probas():
@@ -133,9 +133,9 @@ def get_calibrated_probas():
     return p
 
 
-# ---------------------------------------------------------------------------
+# 
 # Jobs
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/jobs", tags=["jobs"])
 def list_jobs():
@@ -165,9 +165,9 @@ def cancel_all_jobs():
     return {"cancelled": cancelled}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Pipeline
-# ---------------------------------------------------------------------------
+# 
 
 @app.post("/api/simulate", tags=["pipeline"])
 def simulate(params: SimulationParams):
@@ -195,9 +195,9 @@ def calibrate(params: CalibrationParams):
     return {"job_id": job_id, "status": "pending"}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Données paginées (BLOC A5)
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/data/raw", tags=["data"])
 def get_raw_data(
@@ -228,9 +228,9 @@ def get_fraudsters():
     return pr.get_fraudsters_data()
 
 
-# ---------------------------------------------------------------------------
+# 
 # Cas de test
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/test-cases", tags=["test-cases"])
 def list_test_cases():
@@ -252,9 +252,9 @@ def remove_test_case(case_id: str):
     return {"ok": True}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Historique des runs (BLOC C4)
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/runs", tags=["history"])
 def list_runs(
@@ -292,9 +292,9 @@ def get_run_params(run_id: str):
     return params
 
 
-# ---------------------------------------------------------------------------
+# 
 # Santé
-# ---------------------------------------------------------------------------
+# 
 
 @app.get("/api/health", tags=["system"])
 def health():
@@ -310,7 +310,7 @@ def health():
     }
 
 
-# ── Serve React SPA — must be mounted LAST so API routes take priority ────────
+# ── Serve React SPA  must be mounted LAST so API routes take priority ────────
 _frontend_dist = os.environ.get(
     "MOMTSIM_FRONTEND_DIST",
     str(Path(__file__).parent.parent / "frontend" / "dist"),

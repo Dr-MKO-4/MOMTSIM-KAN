@@ -1,5 +1,5 @@
 """
-backend/schemas.py — Modèles Pydantic pour l'API MoMTSim-KAN.
+backend/schemas.py  Modèles Pydantic pour l'API MoMTSim-KAN.
 """
 
 from __future__ import annotations
@@ -7,9 +7,9 @@ from typing import Any, Optional
 from pydantic import BaseModel, Field
 
 
-# ---------------------------------------------------------------------------
-# Config fraude — miroir exact de FRAUD_CONFIG (fraudScenariosConfig.json)
-# ---------------------------------------------------------------------------
+# 
+# Config fraude  miroir exact de FRAUD_CONFIG (fraudScenariosConfig.json)
+# 
 
 class GlobalConfig(BaseModel):
     fraud_target_min: float = Field(0.20, ge=0.0, le=1.0)
@@ -88,9 +88,9 @@ class FraudConfig(BaseModel):
         return d
 
 
-# ---------------------------------------------------------------------------
+# 
 # Paramètres de simulation
-# ---------------------------------------------------------------------------
+# 
 
 class SimulationParams(BaseModel):
     n_clients: int = Field(2000, ge=100)
@@ -103,9 +103,9 @@ class SimulationParams(BaseModel):
     fraud_probas: Optional[dict[str, float]] = None
 
 
-# ---------------------------------------------------------------------------
+# 
 # Job & résultats pipeline
-# ---------------------------------------------------------------------------
+# 
 
 class JobStatus(BaseModel):
     job_id: str
@@ -146,9 +146,9 @@ class KANValidationResult(BaseModel):
     charts: dict[str, str] = {}
 
 
-# ---------------------------------------------------------------------------
+# 
 # Calibration
-# ---------------------------------------------------------------------------
+# 
 
 class CalibrationParams(BaseModel):
     n_clients: int = Field(500, ge=50)

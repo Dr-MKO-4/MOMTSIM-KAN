@@ -213,7 +213,7 @@ export default function HistoryPage() {
   return (
     <Layout
       title="Historique des runs"
-      subtitle="Runs persistés — SQLite registry + dossier runs/"
+      subtitle="Runs persistés  SQLite registry + dossier runs/"
     >
       <div className="space-y-4">
         {/* Toolbar */}

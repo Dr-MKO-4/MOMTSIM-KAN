@@ -1,5 +1,5 @@
 """
-features.py — Ingénierie des caractéristiques transactionnelles
+features.py  Ingénierie des caractéristiques transactionnelles
 (section 3.2.6 du mémoire), calculées à partir de rawLog.csv.
 """
 
@@ -24,7 +24,7 @@ class FeatureEngineer:
         # à une marge conservatrice sur la fenêtre U(2h, 24h) du mémoire.
         self.mule_tolerance_steps = mule_tolerance_steps
 
-    # ------------------------------------------------------------------
+    # 
     def compute_all(self) -> pd.DataFrame:
         df = self.df
         df = self._delta_balances(df)
@@ -40,27 +40,27 @@ class FeatureEngineer:
         self.df = df
         return df
 
-    # ------------------------------------------------------------------
-    # ΔBorig, ΔBdest — 3.2.6, éq. 3.8 / 3.9
-    # ------------------------------------------------------------------
+    # 
+    # ΔBorig, ΔBdest  3.2.6, éq. 3.8 / 3.9
+    # 
     def _delta_balances(self, df: pd.DataFrame) -> pd.DataFrame:
         df["delta_B_orig"] = df["oldBalanceOrig"] - df["newBalanceOrig"]
         df["delta_B_dest"] = df["newBalanceDest"] - df["oldBalanceDest"]
         return df
 
-    # ------------------------------------------------------------------
-    # r1, r2 — éq. 3.10 / 3.11 (feature clé ATO)
-    # ------------------------------------------------------------------
+    # 
+    # r1, r2  éq. 3.10 / 3.11 (feature clé ATO)
+    # 
     def _ratios_r1_r2(self, df: pd.DataFrame) -> pd.DataFrame:
         df["r1"] = df["amount"] / (df["oldBalanceOrig"] + self.eps)
         df["r2"] = df["amount"] / (df["newBalanceOrig"] + self.eps)
         df["r1_r2_product"] = df["r1"] * df["r2"]  # exploitable par un nœud MultKAN
         return df
 
-    # ------------------------------------------------------------------
-    # Flag_anomalie — éq. 3.12, fenêtre glissante des 10 dernières opérations
+    # 
+    # Flag_anomalie  éq. 3.12, fenêtre glissante des 10 dernières opérations
     # du même compte ET du même type de transaction
-    # ------------------------------------------------------------------
+    # 
     def _flag_anomalie(self, df: pd.DataFrame) -> pd.DataFrame:
         df = df.sort_values(["nameOrig", "action", "step"]).reset_index(drop=True)
         grp = df.groupby(["nameOrig", "action"])["amount"]
@@ -71,18 +71,18 @@ class FeatureEngineer:
         df["flag_anomalie"] = (df["amount"] > threshold).fillna(False)
         return df.sort_values("step").reset_index(drop=True)
 
-    # ------------------------------------------------------------------
-    # Flag_nuit — éq. 3.18
-    # ------------------------------------------------------------------
+    # 
+    # Flag_nuit  éq. 3.18
+    # 
     def _flag_nuit(self, df: pd.DataFrame) -> pd.DataFrame:
         hour_of_day = df["step"] % 24
         df["flag_nuit"] = ((hour_of_day >= 22) | (hour_of_day < 6))
         return df
 
-    # ------------------------------------------------------------------
-    # V1h — éq. 3.17, nombre de tx du compte émetteur dans la fenêtre glissante 1h
+    # 
+    # V1h  éq. 3.17, nombre de tx du compte émetteur dans la fenêtre glissante 1h
     # (ici : le step précédent inclus, puisque 1 step = 1h dans ce simulateur)
-    # ------------------------------------------------------------------
+    # 
     def _velocity_1h(self, df: pd.DataFrame) -> pd.DataFrame:
         counts_per_step = df.groupby(["nameOrig", "step"]).size().rename("v1h_raw")
         df = df.merge(counts_per_step, on=["nameOrig", "step"], how="left")
@@ -90,11 +90,11 @@ class FeatureEngineer:
         df = df.drop(columns=["v1h_raw"])
         return df
 
-    # ------------------------------------------------------------------
-    # δ_commission — éq. 3.13, feature Smurfing
+    # 
+    # δ_commission  éq. 3.13, feature Smurfing
     # Appariement transaction TRANSFER entrante la plus récente / sortante
     # la plus proche pour un même compte (candidat mule)
-    # ------------------------------------------------------------------
+    # 
     def _delta_commission_smurfing(self, df: pd.DataFrame) -> pd.DataFrame:
         df["delta_commission"] = np.nan
         df["delta_commission_ratio"] = np.nan
@@ -139,12 +139,12 @@ class FeatureEngineer:
         df = df.drop(columns=[c for c in df.columns if c.endswith("_mule")])
         return df
 
-    # ------------------------------------------------------------------
-    # Var_agent — éq. 3.14, Split Deposit
+    # 
+    # Var_agent  éq. 3.14, Split Deposit
     # Regroupement des CASH_IN au même step, même agent (orig), même client (dest)
     # -> équivalent de la fenêtre 60-120s puisque le simulateur les génère
     # simultanément au même step (limitation de granularité horaire assumée)
-    # ------------------------------------------------------------------
+    # 
     def _var_agent_split_deposit(self, df: pd.DataFrame) -> pd.DataFrame:
         df["var_agent_split"] = np.nan
         df["k_fragments"] = 0
@@ -167,10 +167,10 @@ class FeatureEngineer:
         df = df.drop(columns=[c for c in df.columns if c.endswith("_new")])
         return df
 
-    # ------------------------------------------------------------------
+    # 
     # Helper vectorisé : somme/compte sur fenêtre glissante par borne de step,
     # via cumsum + searchsorted (O(n log n), aucune boucle Python par ligne)
-    # ------------------------------------------------------------------
+    # 
     @staticmethod
     def _windowed_sum_by_group(steps: np.ndarray, values: np.ndarray,
                                 lo_bounds: np.ndarray, hi_bounds: np.ndarray) -> np.ndarray:
@@ -185,10 +185,10 @@ class FeatureEngineer:
         return cumsum[idx_hi] - cumsum[idx_lo]
     
     
-    # ------------------------------------------------------------------
-    # ρ_rupture — éq. 3.15, Fake Credentials
+    # 
+    # ρ_rupture  éq. 3.15, Fake Credentials
     # Moyenne historique sur 30j glissants AVANT la transaction courante
-    # ------------------------------------------------------------------
+    # 
     def _rho_rupture_fake_cred(self, df: pd.DataFrame) -> pd.DataFrame:
         window_steps = 30 * 24
         df = df.sort_values(["nameOrig", "step"]).reset_index(drop=True)
@@ -211,9 +211,9 @@ class FeatureEngineer:
         df["rho_rupture"] = df["amount"] / (df["mean_historique_30j"].fillna(0) + self.eps)
         return df
 
-    # ------------------------------------------------------------------
-    # ρ_refund — éq. 3.16, fenêtre glissante 30j
-    # ------------------------------------------------------------------
+    # 
+    # ρ_refund  éq. 3.16, fenêtre glissante 30j
+    # 
     def _rho_refund(self, df: pd.DataFrame) -> pd.DataFrame:
         window_steps = 30 * 24
         df = df.sort_values(["nameOrig", "step"]).reset_index(drop=True)
@@ -238,9 +238,9 @@ class FeatureEngineer:
         df["rho_refund"] = rho
         return df
 
-    # ------------------------------------------------------------------
-    # ρ_nouveau — éq. 3.19, ratio de destinataires inconnus sur 30/90j
-    # ------------------------------------------------------------------
+    # 
+    # ρ_nouveau  éq. 3.19, ratio de destinataires inconnus sur 30/90j
+    # 
     def _rho_nouveau(self, df: pd.DataFrame) -> pd.DataFrame:
         window_hist = 90 * 24
         window_recent = 30 * 24

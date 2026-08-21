@@ -1,5 +1,5 @@
 """
-viz.py — Visualisation et validation topologique KAN (sections 4.1 & 10 du mémoire).
+viz.py  Visualisation et validation topologique KAN (sections 4.1 & 10 du mémoire).
 Extrait des cellules 20 et 23 du notebook momtsim_kan_pipeline.ipynb.
 """
 
@@ -20,7 +20,7 @@ FEATURES_12 = [
 # de grille B-spline. Une variable à deux points de masse ne peut pas ressembler à une
 # loi normale continue : D_KS serait systématiquement élevé par construction, ce qui
 # fausserait ks_mean (critère de la règle éq. 4.7) et features_needing_transform.
-# log1p n'a pas de sens sur un booléen — ces features sont transmises telles quelles
+# log1p n'a pas de sens sur un booléen  ces features sont transmises telles quelles
 # au pipeline KAN (section 4.1.4 du mémoire).
 BINARY_FEATURES = ["flag_nuit", "flag_anomalie"]
 
@@ -100,7 +100,7 @@ class TopologyValidator:
         self.report["J_Fisher"] = j_fisher
         return j_fisher
 
-    # eq. 4.5 — test KS vs loi normale de référence
+    # eq. 4.5  test KS vs loi normale de référence
     @staticmethod
     def _ks_statistic_vs_normal(x: np.ndarray) -> float:
         x_sorted = np.sort(x)
@@ -128,11 +128,11 @@ class TopologyValidator:
         self.report["features_needing_transform"] = [f for f, d in ks_results.items() if d >= 0.15]
         return ks_results
 
-    # eq. 4.6 — couverture de la grille sur [-3, 3]
+    # eq. 4.6  couverture de la grille sur [-3, 3]
     # HYPOTHÈSE PROVISOIRE : les bornes [-3, 3] supposent une normalisation z-score standard
     # (convention post-normalisation éq. 4.1, ~99,7 % de la masse gaussienne théorique).
     # Ces valeurs seront à réviser une fois l'architecture MKAN réellement définie
-    # (section 4.2 du mémoire, hors périmètre Phase 1 — ne pas modifier avant cette étape).
+    # (section 4.2 du mémoire, hors périmètre Phase 1  ne pas modifier avant cette étape).
     def grid_coverage(self, grid_min: float = -3.0, grid_max: float = 3.0) -> dict:
         if self.X_norm is None:
             self.normalize()
@@ -151,7 +151,7 @@ class TopologyValidator:
             f for f, r in coverage.items() if not (0.8 <= r <= 1.0)]
         return coverage
 
-    # eq. 4.7 — règle de décision
+    # eq. 4.7  règle de décision
     def decide(self) -> str:
         j_fisher = self.report.get("J_Fisher")
         ve2 = self.report.get("VE2")
@@ -213,7 +213,7 @@ class TopologyValidator:
         if retries >= max_retries and report.get("decision") == "Transformations requises":
             report["transform_warning"] = (
                 f"Après {max_retries} transformation(s), le test KS reste positif. "
-                "Décision retournée en l'état — vérification manuelle requise avant "
+                "Décision retournée en l'état  vérification manuelle requise avant "
                 "transmission au pipeline KAN."
             )
         self.report = report
@@ -239,7 +239,7 @@ class TopologyValidator:
                 x=self.Z[mask, 0], y=self.Z[mask, 1], mode="markers", name=label,
                 marker=dict(size=4, color=color, opacity=0.5)))
         fig.update_layout(
-            title=f"Projection PCA — VE2={self.report.get('VE2', 0):.3f}, "
+            title=f"Projection PCA  VE2={self.report.get('VE2', 0):.3f}, "
                   f"J_Fisher={self.report.get('J_Fisher', 0):.3f}",
             xaxis_title="Composante principale 1", yaxis_title="Composante principale 2",
             template="simple_white", height=550,
@@ -315,7 +315,7 @@ class MoMTSimVisualizer:
         fig.add_trace(go.Scatter(x=list(range(720)), y=sim_counts.values, mode="lines",
                                  name="Simulé", line=dict(color="#3B82F6", width=1.5, dash="dot")))
         fig.update_layout(
-            title=f"Validation SSE — {action} (NRMSE = {nrmse:.4f})",
+            title=f"Validation SSE  {action} (NRMSE = {nrmse:.4f})",
             xaxis_title="Step (heure)", yaxis_title="Nombre de transactions",
             height=450, **self._light_layout())
         return fig
@@ -379,7 +379,7 @@ class MoMTSimVisualizer:
                                        opacity=0.6, histnorm="probability density",
                                        showlegend=(i == 0)), row=row, col=col)
         fig.update_layout(
-            title="Distributions des features clés — légitime vs fraude",
+            title="Distributions des features clés  légitime vs fraude",
             template="simple_white", height=300 * ((n + 1) // 2), barmode="overlay",
             paper_bgcolor="#FFFFFF", plot_bgcolor="#F8FAFC", font=dict(color="#0F172A"))
         return fig
@@ -433,7 +433,7 @@ class MoMTSimVisualizer:
                       annotation_text="seuil 10% (Zhdanova et al.)",
                       annotation_font_color="#EF4444")
         fig.update_layout(
-            title="Distribution de la commission mule observée (Smurfing — critère Zhdanova et al.)",
+            title="Distribution de la commission mule observée (Smurfing  critère Zhdanova et al.)",
             xaxis_title="δ = (montant_reçu − montant_envoyé) / montant_reçu",
             yaxis_title="Fréquence",
             barmode="overlay",
@@ -480,7 +480,7 @@ class MoMTSimVisualizer:
             texttemplate="%{text}",
             colorbar=dict(title="NRMSE")))
         fig.update_layout(
-            title="NRMSE par action × estimateur — validation SSE (section 3.1.3)",
+            title="NRMSE par action × estimateur  validation SSE (section 3.1.3)",
             xaxis_title="Action", yaxis_title="Estimateur",
             height=320, **self._light_layout())
         return fig
@@ -488,7 +488,7 @@ class MoMTSimVisualizer:
     # ── A2 : Conformité par scénario ────────────────────────────────────────
 
     def plot_ato_exfiltration_window(self) -> go.Figure:
-        """Montant exfiltré par step — fenêtre d'exfiltration ATO (§3.2.1)."""
+        """Montant exfiltré par step  fenêtre d'exfiltration ATO (§3.2.1)."""
         ato = self.df[(self.df.get("fraudScenario", pd.Series()) == "ATO") &
                       (self.df["action"] == "TRANSFER")] if "fraudScenario" in self.df.columns else pd.DataFrame()
 
@@ -512,7 +512,7 @@ class MoMTSimVisualizer:
                                showarrow=False, font=dict(color="#94A3B8"))
 
         fig.update_layout(
-            title="Fenêtre d'exfiltration ATO — montants TRANSFER par step (§3.2.1)",
+            title="Fenêtre d'exfiltration ATO  montants TRANSFER par step (§3.2.1)",
             xaxis_title="Step (heure)", yaxis_title="Montant exfiltré (FCFA)",
             height=380, **self._light_layout())
         return fig
@@ -536,7 +536,7 @@ class MoMTSimVisualizer:
                                showarrow=False, font=dict(color="#94A3B8"))
 
         fig.update_layout(
-            title="Distribution des délais PAYMENT → REFUND — Δt ~ U(delay_min, delay_max) (§3.2.2)",
+            title="Distribution des délais PAYMENT → REFUND  Δt ~ U(delay_min, delay_max) (§3.2.2)",
             xaxis_title="Délai (heures)", yaxis_title="Fréquence",
             height=380, **self._light_layout())
         return fig
@@ -556,7 +556,7 @@ class MoMTSimVisualizer:
                                showarrow=False, font=dict(color="#94A3B8"))
 
         fig.update_layout(
-            title="Périodes de dormance — Fake Credentials (§3.2.3, dormance ∈ [min, max] jours)",
+            title="Périodes de dormance  Fake Credentials (§3.2.3, dormance ∈ [min, max] jours)",
             xaxis_title="Dormance (heures)", yaxis_title="Fréquence",
             height=380, **self._light_layout())
         return fig
@@ -589,7 +589,7 @@ class MoMTSimVisualizer:
                                showarrow=False, font=dict(color="#94A3B8"))
 
         fig.update_layout(
-            title="Variance intra-opération des fragments — Split Deposit (§3.2.4, éq. 3.14)",
+            title="Variance intra-opération des fragments  Split Deposit (§3.2.4, éq. 3.14)",
             xaxis_title="Variance des montants par opération", yaxis_title="Fréquence",
             height=380, **self._light_layout())
         return fig
@@ -618,16 +618,16 @@ class MoMTSimVisualizer:
                               annotation_text=f"μ = {mean_i:.0f} h",
                               annotation_font_color="#EF4444")
             else:
-                fig.add_annotation(text="Un seul event par émetteur — pas d'intervalle calculable",
+                fig.add_annotation(text="Un seul event par émetteur  pas d'intervalle calculable",
                                    xref="paper", yref="paper", x=0.5, y=0.5,
                                    showarrow=False, font=dict(color="#94A3B8"))
         else:
-            fig.add_annotation(text="Moins de 2 opérations Smurfing — intervalles non calculables",
+            fig.add_annotation(text="Moins de 2 opérations Smurfing  intervalles non calculables",
                                xref="paper", yref="paper", x=0.5, y=0.5,
                                showarrow=False, font=dict(color="#94A3B8"))
 
         fig.update_layout(
-            title="Périodicité des opérations Smurfing — intervalles inter-op (§3.2.5)",
+            title="Périodicité des opérations Smurfing  intervalles inter-op (§3.2.5)",
             xaxis_title="Intervalle (heures/steps)", yaxis_title="Fréquence",
             height=380, **self._light_layout())
         return fig
@@ -711,7 +711,7 @@ class MoMTSimVisualizer:
             )
         )])
         fig.update_layout(
-            title="Réseau Smurfing — flux émetteur→mule→récepteur (§3.2.5, Zhdanova et al.)",
+            title="Réseau Smurfing  flux émetteur→mule→récepteur (§3.2.5, Zhdanova et al.)",
             height=500, **self._light_layout())
         return fig
 
@@ -756,7 +756,7 @@ class MoMTSimVisualizer:
                                  marker_color=clr, showlegend=True), row=1, col=2)
 
         fig.update_layout(
-            title="Synthèse par scénario — activité frauduleuse (section 3.2 du mémoire)",
+            title="Synthèse par scénario  activité frauduleuse (section 3.2 du mémoire)",
             height=400, barmode="group",
             **self._light_layout())
         return fig
@@ -770,7 +770,7 @@ class MoMTSimVisualizer:
         steps = result.get("steps_run", 720)
         by_sc = result.get("fraud_by_scenario", {})
 
-        top_sc = max(by_sc, key=by_sc.get) if by_sc else "—"
+        top_sc = max(by_sc, key=by_sc.get) if by_sc else ""
         top_pct = by_sc.get(top_sc, 0.0) * 100
 
         lines = [
@@ -780,11 +780,11 @@ class MoMTSimVisualizer:
         if by_sc:
             lines.append(f"Le scénario dominant est {top_sc} ({top_pct:.1f} % des fraudes).")
         if rate > 0.26:
-            lines.append("⚠ Taux supérieur à 26 % — risque de sur-calibration sur les patterns frauduleux (§3.1.1).")
+            lines.append("⚠ Taux supérieur à 26 %  risque de sur-calibration sur les patterns frauduleux (§3.1.1).")
         elif rate < 0.20:
-            lines.append("⚠ Taux inférieur à 20 % — relancer la calibration SPSA (cible [20 %, 26 %], §3.1.1).")
+            lines.append("⚠ Taux inférieur à 20 %  relancer la calibration SPSA (cible [20 %, 26 %], §3.1.1).")
         else:
-            lines.append("Taux dans la plage cible [20 %, 26 %] — cohérent avec Azamuke (2024, 2025) et §3.1.1.")
+            lines.append("Taux dans la plage cible [20 %, 26 %]  cohérent avec Azamuke (2024, 2025) et §3.1.1.")
         return " ".join(lines)
 
     @staticmethod
@@ -804,7 +804,7 @@ class MoMTSimVisualizer:
         if needs:
             lines.append(f"{len(needs)} feature(s) nécessite(nt) une transformation log(1+x) : {', '.join(needs)}.")
         if dec == "KAN valide":
-            lines.append("L'architecture KAN est validée — les données peuvent être transmises au pipeline MKAN.")
+            lines.append("L'architecture KAN est validée  les données peuvent être transmises au pipeline MKAN.")
         elif dec == "Transformations requises":
             lines.append("Après application de log(1+x), re-vérifier la décision.")
         else:

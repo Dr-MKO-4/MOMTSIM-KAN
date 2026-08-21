@@ -84,7 +84,7 @@ export default function KANPage() {
   return (
     <Layout
       title="Validation Topologique KAN"
-      subtitle="Quick Decision Rule — section 4.1 du mémoire (éqs. 4.1–4.7)"
+      subtitle="Quick Decision Rule  section 4.1 du mémoire (éqs. 4.1–4.7)"
     >
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* ── Left panel ────────────────────────────────────────────── */}
@@ -92,7 +92,7 @@ export default function KANPage() {
           {/* Decision criteria */}
           <div className="card">
             <h2 className="section-title mb-0.5">Critères de validation</h2>
-            <p className="text-xs text-text-muted mb-3">Règle de décision — éq. 4.7</p>
+            <p className="text-xs text-text-muted mb-3">Règle de décision  éq. 4.7</p>
             <div className="space-y-2">
               {[
                 {
@@ -167,7 +167,7 @@ export default function KANPage() {
               <div className="card flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <p className="text-2xs text-text-dim uppercase tracking-widest mb-1.5 font-mono">
-                    Décision — éq. 4.7
+                    Décision  éq. 4.7
                   </p>
                   <DecisionBadge decision={result.decision} />
                 </div>
@@ -233,10 +233,10 @@ export default function KANPage() {
               {Object.keys(result.grid_coverage).length > 0 && (
                 <div className="card">
                   <h3 className="card-title mb-0.5">
-                    Couverture de grille ρ_coverage — éq. 4.6
+                    Couverture de grille ρ_coverage  éq. 4.6
                   </h3>
                   <p className="text-xs text-text-muted mb-3">
-                    Grille B-spline [-3, 3] — seuil optimal [0.8, 1.0]
+                    Grille B-spline [-3, 3]  seuil optimal [0.8, 1.0]
                   </p>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                     {Object.entries(result.grid_coverage).map(([feat, rho]) => {
@@ -264,14 +264,14 @@ export default function KANPage() {
               {result.charts.pca_projection && (
                 <PlotlyEmbed
                   html={result.charts.pca_projection}
-                  title="Projection PCA — espace latent Z (éqs. 4.2–4.3)"
+                  title="Projection PCA  espace latent Z (éqs. 4.2–4.3)"
                   height={500}
                 />
               )}
               {result.charts.ks_summary && (
                 <PlotlyEmbed
                   html={result.charts.ks_summary}
-                  title="Test KS par feature — D_KS vs seuil 0.15 (éq. 4.5)"
+                  title="Test KS par feature  D_KS vs seuil 0.15 (éq. 4.5)"
                   height={400}
                 />
               )}

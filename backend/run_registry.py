@@ -1,5 +1,5 @@
 """
-backend/run_registry.py — Persistance SQLite des runs MoMTSim-KAN.
+backend/run_registry.py  Persistance SQLite des runs MoMTSim-KAN.
 Table unique : runs(id TEXT PK, run_type TEXT, timestamp TEXT, folder TEXT, summary JSON).
 Le dossier runs/ est créé à côté de ce fichier si absent.
 """
@@ -54,7 +54,7 @@ def register_run(job_id: str, run_type: str, result: dict) -> str:
                 shutil.copy2(src, folder_path / src.name)
             break
 
-    # Sauvegarder les métadonnées (sans les HTML Plotly — trop lourds)
+    # Sauvegarder les métadonnées (sans les HTML Plotly  trop lourds)
     meta = {k: v for k, v in result.items() if k != "charts"}
     meta["job_id"] = job_id
     meta["run_type"] = run_type

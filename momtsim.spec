@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 import sys ; sys.setrecursionlimit(sys.getrecursionlimit() * 5)
 """
-PyInstaller spec — MoMTSim backend server.
+PyInstaller spec  MoMTSim backend server.
 Produit un dossier dist/momtsim_server/ (--onedir) embarqué par Electron.
 
 Construire avec :
@@ -17,7 +17,7 @@ extra_datas = [
     ("frontend/dist",                  "frontend/dist"),
 ]
 
-# ── Imports cachés — uvicorn + FastAPI + starlette staticfiles ────────────────
+# ── Imports cachés  uvicorn + FastAPI + starlette staticfiles ────────────────
 hidden = [
     # uvicorn internals
     "uvicorn.logging",

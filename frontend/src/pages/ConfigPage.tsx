@@ -32,7 +32,7 @@ const SCENARIO_INFO: Record<string, {
     description: "Cibles de calibration SPSA. Ces bornes définissent le taux de fraude acceptable en sortie de simulation.",
     bullets: [
       "Le calibrateur SPSA ajuste θ pour que le taux simulé se situe dans [min, max]",
-      "Valeurs recommandées : [0.20, 0.26] — cible mémoire = 0.23",
+      "Valeurs recommandées : [0.20, 0.26]  cible mémoire = 0.23",
     ],
   },
   ato: {
@@ -72,7 +72,7 @@ const SCENARIO_INFO: Record<string, {
     bullets: [
       "Chaque dépôt = S_COBAC − ε, avec ε ∈ [0, epsilon_max]",
       "Intervalle entre fragments : T_split_min à T_split_max secondes",
-      "Granularité réelle : 1 step = 1 h — arrondis inévitables en simulation",
+      "Granularité réelle : 1 step = 1 h  arrondis inévitables en simulation",
     ],
   },
   smurfing: {
@@ -283,7 +283,7 @@ export default function ConfigPage() {
                   value={a.B_min}
                   onChange={set}
                   min={0}
-                  hint="Solde requis pour être ciblé — les clients sous ce seuil sont ignorés"
+                  hint="Solde requis pour être ciblé  les clients sous ce seuil sont ignorés"
                 />
                 <FormField
                   label="Virements frauduleux min."
@@ -323,7 +323,7 @@ export default function ConfigPage() {
                   value={a.lambda_ato}
                   onChange={set}
                   min={0.1} isFloat
-                  hint="Paramètre λ du processus de Poisson — fréquence d'attaques par step horaire"
+                  hint="Paramètre λ du processus de Poisson  fréquence d'attaques par step horaire"
                 />
               </div>
             )}
@@ -451,13 +451,13 @@ export default function ConfigPage() {
                     value={sd.T_split_max_sec}
                     onChange={set}
                     min={1}
-                    hint="Délai maximal entre deux dépôts — arrondi à 1 step = 1 h en simulation"
+                    hint="Délai maximal entre deux dépôts  arrondi à 1 step = 1 h en simulation"
                   />
                 </div>
                 <div>
                   <p className="label">Grille tarifaire (lecture seule)</p>
                   <p className="text-2xs text-text-dim mb-2">
-                    Seuils COBAC utilisés pour le calcul de delta_commission — éq. 3.13
+                    Seuils COBAC utilisés pour le calcul de delta_commission  éq. 3.13
                   </p>
                   <div className="mt-1.5 space-y-1 rounded-lg overflow-hidden border border-border">
                     <div className="grid grid-cols-2 bg-bg-secondary px-3 py-1.5">
@@ -514,7 +514,7 @@ export default function ConfigPage() {
                   value={sm.S_seuil}
                   onChange={set}
                   min={0}
-                  hint="Montant réglementaire à ne pas dépasser — chaque fragment reste sous ce seuil"
+                  hint="Montant réglementaire à ne pas dépasser  chaque fragment reste sous ce seuil"
                 />
                 <FormField
                   label="Commission mule min."

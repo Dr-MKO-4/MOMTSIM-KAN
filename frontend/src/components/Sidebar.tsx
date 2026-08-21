@@ -108,7 +108,7 @@ function Sidebar({ open, onClose }: Props) {
 
       {/* Footer */}
       <div className="px-5 py-3 border-t border-border">
-        <p className="text-2xs text-text-dim font-mono">Mémoire M2 — 2026</p>
+        <p className="text-2xs text-text-dim font-mono">Mémoire M2  2026</p>
         <p className="text-2xs text-text-dim mt-0.5">Chapitres 3 &amp; 4</p>
       </div>
     </aside>

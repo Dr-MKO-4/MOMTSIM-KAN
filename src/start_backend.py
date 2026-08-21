@@ -1,5 +1,5 @@
 """
-start_backend.py — Lance le serveur FastAPI MoMTSim-KAN.
+start_backend.py  Lance le serveur FastAPI MoMTSim-KAN.
 Usage : python start_backend.py
 """
 

@@ -25,7 +25,7 @@ function saveLS(key: string, value: unknown) {
   try {
     if (value === null) localStorage.removeItem(key);
     else localStorage.setItem(key, JSON.stringify(value));
-  } catch { /* quota exceeded — ignore */ }
+  } catch { /* quota exceeded  ignore */ }
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {

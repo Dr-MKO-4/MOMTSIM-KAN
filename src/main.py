@@ -1,5 +1,5 @@
 """
-main.py — Orchestrateur du pipeline MoMTSim-KAN (version torch).
+main.py  Orchestrateur du pipeline MoMTSim-KAN (version torch).
 Équivalent script de la cellule 7 du notebook momtsim_kan_pipeline.ipynb.
 
 Usage :
@@ -32,7 +32,7 @@ N_STEPS = 720
 MAX_SLOTS = 6
 
 
-# ---------------------------------------------------------------------------
+# 
 def run_simulation(fraud_probas: dict | None = None, verbose: bool = True) -> pd.DataFrame:
     """Lance la simulation complète et retourne le DataFrame brut."""
     params = TorchParameters(PARAM_DIR, FRAUD_CONFIG_PATH, n_clients=N_CLIENTS, seed=SEED)
@@ -57,13 +57,13 @@ def run_simulation(fraud_probas: dict | None = None, verbose: bool = True) -> pd
         injector.inject(step)
 
         if verbose and step % 50 == 0:
-            print(f"step {step}/{N_STEPS} — {len(engine.log_step)} tx cumulées "
+            print(f"step {step}/{N_STEPS}  {len(engine.log_step)} tx cumulées "
                   f"({sum(engine.log_is_fraud)} frauduleuses)", flush=True)
 
     return engine.to_dataframe()
 
 
-# ---------------------------------------------------------------------------
+# 
 def run_calibration() -> dict:
     """Lance la calibration SSE/SPSA (population réduite pour la vitesse)."""
     from calibration_sse import SSEFraudCalibrator
@@ -84,14 +84,14 @@ def run_calibration() -> dict:
     return result["probas"]
 
 
-# ---------------------------------------------------------------------------
+# 
 def run_feature_engineering(df_raw: pd.DataFrame) -> pd.DataFrame:
     """Calcule les 12 features (section 3.2.6) sur le rawLog."""
     engineer = FeatureEngineer(df_raw)
     return engineer.compute_all()
 
 
-# ---------------------------------------------------------------------------
+# 
 def main():
     parser = argparse.ArgumentParser(description="Pipeline MoMTSim-KAN")
     parser.add_argument("--calibrate", action="store_true",
@@ -102,7 +102,7 @@ def main():
                         help="Ne pas calculer les features après la simulation")
     args = parser.parse_args()
 
-    # --- Chargement des probas ---
+    #  Chargement des probas 
     fraud_probas = None
     if args.calibrate:
         fraud_probas = run_calibration()
@@ -115,23 +115,23 @@ def main():
             fraud_probas = json.load(f)
         print(f"Probas calibrées trouvées : {fraud_probas}")
 
-    # --- Simulation ---
+    #  Simulation 
     print("\n=== Simulation complète ===")
     df_raw = run_simulation(fraud_probas=fraud_probas, verbose=True)
     df_raw.to_parquet(str(_ROOT / "config" / "rawLog_torch.parquet"), index=False)
 
     fraud_rate = df_raw["isFraud"].mean()
-    print(f"\nTerminé — {len(df_raw)} transactions")
+    print(f"\nTerminé  {len(df_raw)} transactions")
     print(f"Taux de fraude global : {fraud_rate:.3f}")
     if df_raw["isFraud"].any():
         print(df_raw.loc[df_raw["isFraud"], "fraudScenario"].value_counts(normalize=True))
 
-    # --- Feature engineering ---
+    #  Feature engineering 
     if not args.no_features:
         print("\n=== Feature engineering ===")
         df_features = run_feature_engineering(df_raw)
         df_features.to_parquet(str(_ROOT / "config" / "featuresLog.parquet"), index=False)
-        print(f"featuresLog.parquet sauvegardé — {len(df_features)} lignes, "
+        print(f"featuresLog.parquet sauvegardé  {len(df_features)} lignes, "
               f"{len(df_features.columns)} colonnes")
 
 

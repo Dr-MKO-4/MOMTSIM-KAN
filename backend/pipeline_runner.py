@@ -1,5 +1,5 @@
 """
-backend/pipeline_runner.py — Exécution asynchrone du pipeline MoMTSim-KAN.
+backend/pipeline_runner.py  Exécution asynchrone du pipeline MoMTSim-KAN.
 Utilise BackgroundTasks FastAPI + store in-memory (pas de Celery/Redis).
 """
 
@@ -33,9 +33,9 @@ PARAM_DIR         = str(_bundle / "paramFiles")
 FRAUD_CONFIG_PATH = str(_data   / "fraudScenariosConfig.json")
 OUTPUT_DIR        = _data
 
-# ---------------------------------------------------------------------------
+# 
 # Store in-memory des jobs
-# ---------------------------------------------------------------------------
+# 
 
 _jobs: dict[str, dict] = {}
 _cancel_flags: dict[str, threading.Event] = {}
@@ -90,9 +90,9 @@ def _plotly_html(fig) -> str:
     return fig.to_html(full_html=False, include_plotlyjs="cdn", config={"responsive": True})
 
 
-# ---------------------------------------------------------------------------
+# 
 # Simulation
-# ---------------------------------------------------------------------------
+# 
 
 def _run_simulation_bg(job_id: str, p: SimulationParams) -> None:
     _cancel_event = _cancel_flags[job_id]  # pré-populé par start_simulation
@@ -151,7 +151,7 @@ def _run_simulation_bg(job_id: str, p: SimulationParams) -> None:
             if step % 30 == 0:
                 pct = 5 + int(80 * step / p.n_steps)
                 _update(job_id, progress=pct,
-                        message=f"Step {step}/{p.n_steps} — {_tx_total:,} tx")
+                        message=f"Step {step}/{p.n_steps}  {_tx_total:,} tx")
 
             # Flush every 50 steps : vide les listes, écrit le chunk sans tout garder en RAM
             if (step + 1) % 50 == 0:
@@ -274,9 +274,9 @@ def start_simulation(p: SimulationParams) -> str:
     return job_id
 
 
-# ---------------------------------------------------------------------------
+# 
 # Feature engineering
-# ---------------------------------------------------------------------------
+# 
 
 def _run_features_bg(job_id: str) -> None:
     try:
@@ -332,9 +332,9 @@ def start_features(job_id: str | None = None) -> str:
     return job_id
 
 
-# ---------------------------------------------------------------------------
+# 
 # Validation topologique KAN
-# ---------------------------------------------------------------------------
+# 
 
 def _run_kan_bg(job_id: str) -> None:
     try:
@@ -409,9 +409,9 @@ def start_kan_validation(job_id: str | None = None) -> str:
     return job_id
 
 
-# ---------------------------------------------------------------------------
+# 
 # Calibration SSE/SPSA
-# ---------------------------------------------------------------------------
+# 
 
 def _run_calibration_bg(job_id: str, p: CalibrationParams) -> None:
     _cancel_event = _cancel_flags[job_id]  # pré-populé par start_calibration
@@ -471,9 +471,9 @@ def start_calibration(p: CalibrationParams) -> str:
     return job_id
 
 
-# ---------------------------------------------------------------------------
+# 
 # Endpoints données paginées
-# ---------------------------------------------------------------------------
+# 
 
 def _df_to_rows(chunk: pd.DataFrame) -> list:
     return json.loads(chunk.to_json(orient="values"))

@@ -13,9 +13,9 @@ const FEATURE_META: Record<string, { eq: string; desc: string }> = {
   r2:                     { eq: "3.11", desc: "Ratio montant / solde final" },
   delta_B_orig:           { eq: "3.8",  desc: "Variation du solde émetteur" },
   delta_B_dest:           { eq: "3.9",  desc: "Variation du solde destinataire" },
-  delta_commission_ratio: { eq: "3.13", desc: "Commission mule — Smurfing" },
-  var_agent_split:        { eq: "3.14", desc: "Variance intra-agent — Split Deposit" },
-  rho_rupture:            { eq: "3.15", desc: "Rupture de comportement — Fake Cred" },
+  delta_commission_ratio: { eq: "3.13", desc: "Commission mule  Smurfing" },
+  var_agent_split:        { eq: "3.14", desc: "Variance intra-agent  Split Deposit" },
+  rho_rupture:            { eq: "3.15", desc: "Rupture de comportement  Fake Cred" },
   rho_refund:             { eq: "3.16", desc: "Ratio remboursements / paiements" },
   v1h:                    { eq: "3.17", desc: "Vélocité sur 1h" },
   flag_nuit:              { eq: "3.18", desc: "Transaction nocturne (22h–6h)" },
@@ -52,7 +52,7 @@ export default function FeaturesPage() {
   return (
     <Layout
       title="Feature Engineering"
-      subtitle="12 features vectorisées — section 3.2.6 / éqs. 3.8–3.19"
+      subtitle="12 features vectorisées  section 3.2.6 / éqs. 3.8–3.19"
     >
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* ── Left panel ────────────────────────────────────────────── */}
@@ -130,21 +130,21 @@ export default function FeaturesPage() {
               {result.charts.r1_r2_scatter && (
                 <PlotlyEmbed
                   html={result.charts.r1_r2_scatter}
-                  title="r₁ vs r₂ — signature ATO (éqs. 3.10–3.11)"
+                  title="r₁ vs r₂  signature ATO (éqs. 3.10–3.11)"
                   height={460}
                 />
               )}
               {result.charts.distributions && (
                 <PlotlyEmbed
                   html={result.charts.distributions}
-                  title="Distributions des features clés — légitime vs fraude"
+                  title="Distributions des features clés  légitime vs fraude"
                   height={540}
                 />
               )}
               {result.charts.smurfing_delta && (
                 <PlotlyEmbed
                   html={result.charts.smurfing_delta}
-                  title="Commission mule observée — Smurfing (Zhdanova et al., éq. 3.13)"
+                  title="Commission mule observée  Smurfing (Zhdanova et al., éq. 3.13)"
                   height={380}
                 />
               )}

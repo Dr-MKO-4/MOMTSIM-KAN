@@ -27,11 +27,11 @@ const DEFAULTS: CalibrationParams = {
 const SCENARIO_KEYS = ["ato", "refund", "fake_credentials", "split_deposit", "smurfing_freq_mult"] as const;
 
 const SCENARIO_LABELS: Record<string, string> = {
-  ato:                "ATO — p(fraude)",
-  refund:             "REFUND — p(fraude)",
-  fake_credentials:   "FAKE_CRED — p(fraude)",
-  split_deposit:      "SPLIT_DEP — p(fraude)",
-  smurfing_freq_mult: "SMURFING — freq_mult",
+  ato:                "ATO  p(fraude)",
+  refund:             "REFUND  p(fraude)",
+  fake_credentials:   "FAKE_CRED  p(fraude)",
+  split_deposit:      "SPLIT_DEP  p(fraude)",
+  smurfing_freq_mult: "SMURFING  freq_mult",
 };
 
 const SCENARIO_BAR_SCALE: Record<string, number> = {
@@ -94,7 +94,7 @@ export default function CalibrationPage() {
   return (
     <Layout
       title="Calibration SSE/SPSA"
-      subtitle="θ* = argmin Σ_c Σ_t (Dr − Ds)² — section 3.1.3 du mémoire"
+      subtitle="θ* = argmin Σ_c Σ_t (Dr − Ds)²  section 3.1.3 du mémoire"
     >
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* ── Config panel ──────────────────────────────────────────── */}
@@ -122,7 +122,7 @@ export default function CalibrationPage() {
 
           {/* Formula memo */}
           <div className="card-sm text-xs font-mono space-y-1">
-            <p className="text-2xs text-text-muted uppercase tracking-widest mb-2 font-sans font-medium">Ma contribution — §3.1.4</p>
+            <p className="text-2xs text-text-muted uppercase tracking-widest mb-2 font-sans font-medium">Ma contribution  §3.1.4</p>
             <p className="text-text-muted leading-relaxed">θ* = argmin sse(θ)</p>
             <p className="text-text-dim">sse = Σ_c Σ_t (Dr − D̄s)²</p>
             <p className="text-text-dim">c ∈ {"{ATO, REFUND, FAKE_CRED,"}</p>

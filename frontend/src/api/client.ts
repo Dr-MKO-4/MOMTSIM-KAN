@@ -18,7 +18,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// --- Config ---
+//  Config 
 export const getConfig = () => request<FraudConfig>("/config");
 export const updateConfig = (data: FraudConfig) =>
   request<{ saved: string }>("/config", { method: "PUT", body: JSON.stringify(data) });
@@ -26,10 +26,10 @@ export const listBackups = () => request<BackupEntry[]>("/config/backups");
 export const restoreBackup = (name: string) =>
   request<{ restored: string }>(`/config/restore/${encodeURIComponent(name)}`, { method: "POST" });
 
-// --- Probas ---
+//  Probas 
 export const getProbas = () => request<Record<string, number>>("/probas");
 
-// --- Jobs ---
+//  Jobs 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 export const listJobs = () => request<Job[]>("/jobs");
 export const cancelJob = (id: string) =>
@@ -38,7 +38,7 @@ export const cancelJob = (id: string) =>
 export const cancelAllJobs = () =>
   request<{ cancelled: string[] }>("/jobs/cancel-all", { method: "POST" });
 
-// --- Pipeline ---
+//  Pipeline 
 export const startSimulation = (params: SimulationParams) =>
   request<{ job_id: string }>("/simulate", { method: "POST", body: JSON.stringify(params) });
 
@@ -51,20 +51,20 @@ export const startKANValidation = () =>
 export const startCalibration = (params: CalibrationParams) =>
   request<{ job_id: string }>("/calibrate", { method: "POST", body: JSON.stringify(params) });
 
-// --- Sim config ---
+//  Sim config 
 export const getSimConfig  = () => request<Partial<SimulationParams>>("/sim-config");
 export const saveSimConfig = (params: SimulationParams) =>
   request<{ saved: string }>("/sim-config", { method: "PUT", body: JSON.stringify(params) });
 
-// --- Calib config ---
+//  Calib config 
 export const getCalibConfig  = () => request<Partial<CalibrationParams>>("/calib-config");
 export const saveCalibConfig = (params: CalibrationParams) =>
   request<{ saved: string }>("/calib-config", { method: "PUT", body: JSON.stringify(params) });
 
-// --- Health ---
+//  Health 
 export const getHealth = () => request<HealthStatus>("/health");
 
-// --- Données paginées ---
+//  Données paginées 
 export const fetchRawDataPage = (page = 1, pageSize = 100, filterFraud = false) =>
   request<DataPage>(`/data/raw?page=${page}&page_size=${pageSize}&filter_fraud=${filterFraud}`);
 
@@ -73,7 +73,7 @@ export const fetchFeaturesDataPage = (page = 1, pageSize = 100, filterFraud = fa
 
 export const getFraudsters = () => request<FraudstersData>("/data/fraudsters");
 
-// --- Historique des runs ---
+//  Historique des runs 
 export const listRuns = (runType?: string, limit = 50) => {
   const params = new URLSearchParams({ limit: String(limit) });
   if (runType) params.set("run_type", runType);
@@ -88,7 +88,7 @@ export const deleteRun = (runId: string) =>
 export const getRunParams = (runId: string) =>
   request<SimulationParams>(`/runs/${runId}/params`);
 
-// --- Polling helper ---
+//  Polling helper 
 export function pollJob(
   jobId: string,
   onUpdate: (job: Job) => void,
@@ -102,7 +102,7 @@ export function pollJob(
       onUpdate(job);
       if (job.status === "done" || job.status === "error") return;
     } catch (_) {
-      // réseau temporairement indispo — on continue
+      // réseau temporairement indispo  on continue
     }
     setTimeout(tick, intervalMs);
   };

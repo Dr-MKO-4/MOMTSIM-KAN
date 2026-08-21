@@ -10,8 +10,8 @@ import type { DataPage } from "../types/api";
 type Tab = "features" | "raw";
 
 const TABS: { id: Tab; label: string; desc: string }[] = [
-  { id: "features", label: "Dataset final (features)", desc: "featuresLog.parquet — 12 features KAN" },
-  { id: "raw",      label: "Raw Log",                  desc: "rawLog_torch.parquet — transactions brutes" },
+  { id: "features", label: "Dataset final (features)", desc: "featuresLog.parquet  12 features KAN" },
+  { id: "raw",      label: "Raw Log",                  desc: "rawLog_torch.parquet  transactions brutes" },
 ];
 
 export default function DatasetPage() {
@@ -56,7 +56,7 @@ export default function DatasetPage() {
   return (
     <Layout
       title="Visualisation du dataset"
-      subtitle="Exploration paginée des données simulées — rawLog et featuresLog"
+      subtitle="Exploration paginée des données simulées  rawLog et featuresLog"
     >
       {/* Onglets */}
       <div className="flex gap-1 mb-5 p-1 bg-bg-secondary border border-border w-fit">

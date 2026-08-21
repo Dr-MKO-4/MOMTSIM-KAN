@@ -1,5 +1,5 @@
 """
-run_server.py — Point d'entrée PyInstaller pour MoMTSim.
+run_server.py  Point d'entrée PyInstaller pour MoMTSim.
 
 En mode développement : python run_server.py  (port 8765, sans reload)
 En mode frozen       : lancé par Electron, lit MOMTSIM_PORT depuis l'env.
@@ -25,7 +25,7 @@ def _setup_logging(log_dir: Path) -> Path:
     log_file = log_dir / "momtsim.log"
 
     fmt = logging.Formatter(
-        "%(asctime)s [%(levelname)-8s] %(name)s — %(message)s",
+        "%(asctime)s [%(levelname)-8s] %(name)s  %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     file_handler = RotatingFileHandler(
@@ -46,7 +46,7 @@ def _setup_logging(log_dir: Path) -> Path:
 
 def _uvicorn_log_config(log_file: Path) -> dict:
     """Config de logging passée à uvicorn pour que ses access logs aillent aussi dans le fichier."""
-    _fmt = "%(asctime)s [%(levelname)-8s] %(name)s — %(message)s"
+    _fmt = "%(asctime)s [%(levelname)-8s] %(name)s  %(message)s"
     _file = str(log_file)
     return {
         "version": 1,
