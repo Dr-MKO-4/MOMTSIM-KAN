@@ -1,0 +1,11 @@
+# Dépendances backend MOMTSIM pour Mac Apple Silicon (M4/M6).
+# torch officiel PyPI inclut déjà le support MPS pour macOS arm64,
+# aucun index/build spécial n'est nécessaire (contrairement à CUDA).
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+pydantic>=2.7.0
+numpy>=1.26.0
+pandas>=2.2.0
+torch>=2.3.0
+plotly>=5.22.0

@@ -9,12 +9,26 @@ indexés dans un unique tenseur de solde `balance` de taille n_actors, pour
 permettre des opérations scatter/gather uniformes.
 """
 
+import os
 import numpy as np
 import torch
 import pandas as pd
 import json
 
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+def _select_device() -> torch.device:
+    """cuda > mps > cpu, avec override manuel via MOMTSIM_DEVICE (cpu/cuda/mps)."""
+    forced = os.environ.get("MOMTSIM_DEVICE")
+    if forced:
+        return torch.device(forced)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+DEVICE = _select_device()
 
 
 class TorchParameters:
