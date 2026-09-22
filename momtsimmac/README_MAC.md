@@ -5,7 +5,7 @@ lancer le backend Python de MOMTSIM (FastAPI + moteur torch) sur Mac, avec
 détection automatique du GPU Apple Silicon (MPS) en plus de CPU/CUDA.
 
 Le frontend React et le serveur FastAPI sont lancés séparément par toi sur le
-Mac (pas via Electron) — ce dossier ne concerne que le backend Python.
+Mac (pas via Electron)  ce dossier ne concerne que le backend Python.
 
 ## Installation
 
@@ -24,7 +24,7 @@ PyPI inclut déjà le support MPS pour macOS arm64.
 Le moteur (`src/momtsim_torch.py`) exécute une boucle séquentielle de 720 steps
 avec beaucoup de petites opérations tensorielles par step. Le GPU MPS a un coût
 de lancement de kernel par opération qui peut annuler son avantage sur des
-tenseurs de cette taille — donc ne pas supposer que MPS est plus rapide,
+tenseurs de cette taille  donc ne pas supposer que MPS est plus rapide,
 le mesurer :
 
 ```bash
@@ -67,9 +67,9 @@ npm run dev
   `torch.multinomial` avec `generator`, `torch.distributions.Binomial`) n'ont
   pas toutes un support MPS natif complet selon la version de PyTorch. Avec
   `PYTORCH_ENABLE_MPS_FALLBACK=1` (déjà activé par `run_mac.sh`), ces
-  opérations basculent silencieusement sur CPU — ce qui coûte un aller-retour
+  opérations basculent silencieusement sur CPU  ce qui coûte un aller-retour
   mémoire GPU↔CPU sans erreur visible. C'est une des raisons pour lesquelles
   le bench mesure le temps de bout en bout plutôt que de supposer un gain.
-- Ce dossier ne construit pas d'app `.app` empaquetée (Electron) — build mac
+- Ce dossier ne construit pas d'app `.app` empaquetée (Electron)  build mac
   d'Electron non testé depuis cet environnement Windows, à faire séparément
   si besoin.
