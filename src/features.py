@@ -127,15 +127,20 @@ class FeatureEngineer:
         merged["is_mule_candidate"] = (merged["delta_ratio"] > 0) & (merged["delta_ratio"] <= 0.10)
 
         agg = merged.groupby("account").agg(
+            delta_commission=("delta", "last"),
             delta_commission_ratio=("delta_ratio", "last"),
             is_mule_candidate=("is_mule_candidate", "any")).reset_index()
 
         df = df.merge(
             agg.rename(columns={"account": "nameOrig"}),
             on="nameOrig", how="left", suffixes=("", "_mule"))
+        df["delta_commission"] = df["delta_commission_mule"].combine_first(
+            df["delta_commission"])
         df["delta_commission_ratio"] = df["delta_commission_ratio_mule"].combine_first(
             df["delta_commission_ratio"])
-        df["is_mule_candidate"] = df["is_mule_candidate_mule"].fillna(False).astype(bool)
+        # NaN (compte sans appariement) -> False ; la comparaison évite le
+        # downcasting implicite de fillna() déprécié depuis pandas 2.1.
+        df["is_mule_candidate"] = (df["is_mule_candidate_mule"] == True)  # noqa: E712
         df = df.drop(columns=[c for c in df.columns if c.endswith("_mule")])
         return df
 

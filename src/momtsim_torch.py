@@ -41,9 +41,13 @@ class TorchParameters:
     OUT_ACTIONS = {"CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER"}
 
     def __init__(self, param_dir: str, fraud_config_path: str, n_clients: int,
-                 seed: int = 1000):
+                 seed: int = 1000, volume_scale: float = 1.0):
         self.rng = np.random.default_rng(seed)
         self.n_clients = n_clients
+        # Facteur appliqué au volume de transactions légitimes par step (1.0 = profil
+        # calibré). Permet un régime clairsemé (peu de transactions par client) avec
+        # une population de taille raisonnable, sans toucher aux calibrations offline.
+        self.volume_scale = float(volume_scale)
 
         self.client_profiles_df = pd.read_csv(f"{param_dir}/clientsProfiles.csv")
         self.agg_df = pd.read_csv(f"{param_dir}/aggregatedTransactions.csv")
@@ -142,6 +146,7 @@ class TorchParameters:
         for s, c in by_step.items():
             if 0 <= int(s) < 720:
                 arr[int(s)] = c
+        arr = np.round(arr * self.volume_scale)   # entiers : requis par la loi binomiale
         self.step_target_count = torch.tensor(arr, dtype=torch.float32, device=DEVICE)
 
         # profils horaires par action (avg, std) pour le mix avec le profil client
@@ -414,19 +419,28 @@ class TorchMoMTSimEngine:
             self.log_scenario.extend([None] * active_np.sum())
 
     # 
+    def step_once(self, step: int):
+        """Exécute un seul step à l'indice fourni.
+
+        `step` est un indice absolu fourni par l'appelant : il peut croître
+        indéfiniment (flux live), le rebouclage ne concerne que le profil
+        step_target_count.
+        """
+        n_tx_target = self.params.step_target_count[step % len(self.params.step_target_count)]
+        n_tx_per_client = torch.distributions.Binomial(
+            total_count=n_tx_target.clamp(min=0),
+            probs=self.params.client_weight.clamp(0, 1)
+        ).sample()
+        n_tx_per_client = torch.clamp(n_tx_per_client, max=self.max_slots).long()
+
+        for slot in range(self.max_slots):
+            slot_mask = n_tx_per_client > slot
+            if slot_mask.any():
+                self._run_step_slot(step, slot_mask)
+
     def run(self, n_steps: int = 720, verbose=True) -> pd.DataFrame:
         for step in range(n_steps):
-            n_tx_target = self.params.step_target_count[step % len(self.params.step_target_count)]
-            n_tx_per_client = torch.distributions.Binomial(
-                total_count=n_tx_target.clamp(min=0),
-                probs=self.params.client_weight.clamp(0, 1)
-            ).sample()
-            n_tx_per_client = torch.clamp(n_tx_per_client, max=self.max_slots).long()
-
-            for slot in range(self.max_slots):
-                slot_mask = n_tx_per_client > slot
-                if slot_mask.any():
-                    self._run_step_slot(step, slot_mask)
+            self.step_once(step)
 
             if verbose and step % 50 == 0:
                 print(f"step {step}/{n_steps}  {len(self.log_step)} tx cumulées", flush=True)
@@ -521,7 +535,7 @@ class TorchMoMTSimEngine:
 
 class TorchFraudInjector:
     def __init__(self, engine: TorchMoMTSimEngine, params: TorchParameters,
-                 fraud_probas: dict = None, seed: int = 1000):
+                 fraud_probas: dict = None, seed: int = 1000, volume_follow: bool = False):
         self.engine = engine
         self.params = params
         self.cfg = params.fraud_config
@@ -581,6 +595,14 @@ class TorchFraudInjector:
         # pour que le taux de fraude cible (~23%) soit atteignable par SPSA.
         # Référence : n_mules >= 300 garantit un taux max >23% sur step_target_count réel.
         self._n_inject_per_step = max(1, engine.n_mules)
+        # Option flux live : le profil de volume légitime varie d'un facteur ~4 sur le
+        # cycle de 720 steps alors que l'injection est constante, ce qui fait osciller
+        # le taux de fraude de 13 % à près de 60 %. Avec volume_follow, le nombre
+        # d'injections suit le volume du step (moyenne inchangée).
+        self.volume_follow = bool(volume_follow)
+        tgt = params.step_target_count.detach().cpu().numpy()
+        self._target = tgt
+        self._mean_target = float(tgt.mean()) or 1.0
 
     # 
     def _log(self, step, action, amount, orig, dest, scenario,
@@ -867,7 +889,11 @@ class TorchFraudInjector:
         # Boucle d'injection : _n_inject_per_step tirages indépendants par step.
         # ATO / REFUND / SPLIT_DEP scalent avec n_mules.
         # FAKE_CRED et SMURFING sont des machines d'états  appelés une seule fois par step.
-        for _ in range(self._n_inject_per_step):
+        n_inject = self._n_inject_per_step
+        if self.volume_follow:
+            ratio = float(self._target[step % len(self._target)]) / self._mean_target
+            n_inject = max(1, int(round(self._n_inject_per_step * ratio)))
+        for _ in range(n_inject):
             if self.gen.uniform() < self.probas["ato"]:
                 self._run_ato(step)
             if self.gen.uniform() < self.probas["refund"]:

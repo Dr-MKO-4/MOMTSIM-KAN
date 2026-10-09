@@ -1,0 +1,5 @@
+# Dépendances du flux live (producteur Kafka + serveur REST).
+# Le moteur de simulation lui-même utilise les dépendances de backend/requirements.txt.
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+kafka-python>=2.0
