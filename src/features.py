@@ -7,6 +7,12 @@ import numpy as np
 import pandas as pd
 
 
+def _as_key(values: np.ndarray) -> np.ndarray:
+    """Identifiants de compte en int64 s'ils sont entiers (merge_asof n'accepte
+    pas une clé `by` en int32), inchangés sinon (identifiants texte du flux live)."""
+    return values.astype(np.int64) if np.issubdtype(values.dtype, np.integer) else values
+
+
 class FeatureEngineer:
     """
     Calcule, pour chaque transaction du rawLog, l'ensemble des features
@@ -18,10 +24,9 @@ class FeatureEngineer:
     def __init__(self, df: pd.DataFrame, eps: float = 1e-6, mule_tolerance_steps: int = 48):
         self.df = df.copy().sort_values(["step"]).reset_index(drop=True)
         self.eps = eps
-        # Tolérance temporelle pour l'appariement mule (smurfing) :
-        # delay_mule_max_hours (= 24, section 3.2.5) × 2 = 48 steps (1 step = 1h).
-        # Le facteur ×2 absorbe les arrondis horaires du simulateur et correspond
-        # à une marge conservatrice sur la fenêtre U(2h, 24h) du mémoire.
+        # Tolérance temporelle pour l'appariement mule (smurfing), en steps (1 step = 1h).
+        # 48 couvre largement le délai de relais mule -> récepteur du simulateur
+        # (delay_mule_max_hours = 12 dans fraudScenariosConfig.json).
         self.mule_tolerance_steps = mule_tolerance_steps
 
     # 
@@ -90,58 +95,62 @@ class FeatureEngineer:
         df = df.drop(columns=["v1h_raw"])
         return df
 
-    # 
+    #
     # δ_commission  éq. 3.13, feature Smurfing
-    # Appariement transaction TRANSFER entrante la plus récente / sortante
-    # la plus proche pour un même compte (candidat mule)
-    # 
+    # Calcul CAUSAL, au niveau de la transaction : chaque TRANSFER sortant d'un
+    # compte est apparié au TRANSFER entrant le plus récent sur ce même compte,
+    # reçu à un step STRICTEMENT antérieur et au plus mule_tolerance_steps avant.
+    # La valeur n'est portée que par la ligne sortante appariée (NaN ailleurs).
+    #
+    # Ancienne version : agrégat « last » par compte sur tout le journal, recopié
+    # sur TOUTES les lignes du compte -> une transaction recevait la commission
+    # d'une paire survenue après elle (fuite du futur), et la variable n'était
+    # pas calculable en flux.
+    #
     def _delta_commission_smurfing(self, df: pd.DataFrame) -> pd.DataFrame:
         df["delta_commission"] = np.nan
         df["delta_commission_ratio"] = np.nan
         df["is_mule_candidate"] = False
 
-        transfers = df[df["action"] == "TRANSFER"].copy()
+        transfers = df[df["action"] == "TRANSFER"]
         if transfers.empty:
             return df
 
-        in_tx = transfers[["nameDest", "step", "amount"]].rename(
-            columns={"nameDest": "account", "amount": "amount_in", "step": "step_in"})
-        out_tx = transfers[["nameOrig", "step", "amount"]].rename(
-            columns={"nameOrig": "account", "amount": "amount_out", "step": "step_out"})
+        out_tx = pd.DataFrame({
+            "row": transfers.index.values,
+            "account": _as_key(transfers["nameOrig"].values),
+            # int64 : merge_asof refuse une clé int32 avec une tolérance entière
+            "step_out": transfers["step"].values.astype(np.int64),
+            "amount_out": transfers["amount"].values,
+        }).sort_values("step_out", kind="mergesort")
+        # Tri (step, montant) : à égalité de step, merge_asof retient la dernière
+        # ligne, soit le plus gros montant reçu -- règle déterministe partagée avec
+        # dashboard/stream_features.py (l'ordre intra-step n'est pas connu).
+        in_tx = pd.DataFrame({
+            "account": _as_key(transfers["nameDest"].values),
+            "step_in": transfers["step"].values.astype(np.int64),
+            "amount_in": transfers["amount"].values,
+        }).sort_values(["step_in", "amount_in"], kind="mergesort")
 
-        in_tx = in_tx.sort_values(["account", "step_in"])
-        out_tx = out_tx.sort_values(["account", "step_out"])
-
-        # appariement asof : pour chaque sortie, la dernière entrée précédente sur le même compte,
-        # dans une fenêtre de mule_tolerance_steps (défaut 48h = delay_mule_max_hours × 2).
-        # Toute paire dont l'écart step_out − step_in dépasse cette tolérance est ignorée
-        # (NaN dans step_in) : le compte ne reçoit pas is_mule_candidate=True par coïncidence.
+        # allow_exact_matches=False : l'ordre des transactions à l'intérieur d'un
+        # step (1 h) n'est pas connu, une entrée du même step ne peut donc pas être
+        # tenue pour antérieure. Le relais mule -> récepteur du simulateur est
+        # différé d'au moins 1 step (delay_mule_min_hours), il n'est pas perdu.
         merged = pd.merge_asof(
-            out_tx.sort_values("step_out"), in_tx.sort_values("step_in"),
-            left_on="step_out", right_on="step_in", by="account", direction="backward",
-            tolerance=self.mule_tolerance_steps)
-        merged["delta"] = merged["amount_in"] - merged["amount_out"]
-        merged["delta_ratio"] = merged["delta"] / (merged["amount_in"] + self.eps)
+            out_tx, in_tx, left_on="step_out", right_on="step_in", by="account",
+            direction="backward", tolerance=self.mule_tolerance_steps,
+            allow_exact_matches=False)
+        matched = merged[merged["amount_in"].notna()]
+        if matched.empty:
+            return df
 
+        delta = matched["amount_in"].values - matched["amount_out"].values
+        ratio = delta / (matched["amount_in"].values + self.eps)
+        rows = matched["row"].values
+        df.loc[rows, "delta_commission"] = delta
+        df.loc[rows, "delta_commission_ratio"] = ratio
         # Critère 1 de Zhdanova et al. : 0 < δ ≤ 10% du montant reçu
-        merged["is_mule_candidate"] = (merged["delta_ratio"] > 0) & (merged["delta_ratio"] <= 0.10)
-
-        agg = merged.groupby("account").agg(
-            delta_commission=("delta", "last"),
-            delta_commission_ratio=("delta_ratio", "last"),
-            is_mule_candidate=("is_mule_candidate", "any")).reset_index()
-
-        df = df.merge(
-            agg.rename(columns={"account": "nameOrig"}),
-            on="nameOrig", how="left", suffixes=("", "_mule"))
-        df["delta_commission"] = df["delta_commission_mule"].combine_first(
-            df["delta_commission"])
-        df["delta_commission_ratio"] = df["delta_commission_ratio_mule"].combine_first(
-            df["delta_commission_ratio"])
-        # NaN (compte sans appariement) -> False ; la comparaison évite le
-        # downcasting implicite de fillna() déprécié depuis pandas 2.1.
-        df["is_mule_candidate"] = (df["is_mule_candidate_mule"] == True)  # noqa: E712
-        df = df.drop(columns=[c for c in df.columns if c.endswith("_mule")])
+        df.loc[rows, "is_mule_candidate"] = (ratio > 0) & (ratio <= 0.10)
         return df
 
     # 
@@ -216,27 +225,36 @@ class FeatureEngineer:
         df["rho_rupture"] = df["amount"] / (df["mean_historique_30j"].fillna(0) + self.eps)
         return df
 
-    # 
+    #
     # ρ_refund  éq. 3.16, fenêtre glissante 30j
-    # 
+    # Remboursements REÇUS par le compte / paiements ÉMIS par le compte.
+    # Un REFUND est émis par le marchand (nameOrig = marchand, nameDest = client
+    # remboursé) : le compter côté émetteur, comme auparavant, laissait le
+    # fraudeur à 0 et attribuait le ratio aux marchands.
+    #
     def _rho_refund(self, df: pd.DataFrame) -> pd.DataFrame:
         window_steps = 30 * 24
         df = df.sort_values(["nameOrig", "step"]).reset_index(drop=True)
 
-        is_refund = (df["action"].values == "REFUND").astype(float)
         is_payment = (df["action"].values == "PAYMENT").astype(float)
+        refunds = df.loc[df["action"].values == "REFUND", ["nameDest", "step"]]
+        refund_steps = {acct: np.sort(g.values)
+                        for acct, g in refunds.groupby("nameDest")["step"]}
         rho = np.zeros(len(df))
 
-        for _, idx in df.groupby("nameOrig").indices.items():
+        for acct, idx in df.groupby("nameOrig").indices.items():
             idx = np.sort(idx)
             steps_g = df["step"].values[idx]
-            refund_g = is_refund[idx]
             payment_g = is_payment[idx]
 
             lo = steps_g - window_steps
-            hi = steps_g + 1  # inclusif : la transaction courante compte
+            hi = steps_g + 1  # inclusif : le step courant compte
 
-            n_refund = self._windowed_sum_by_group(steps_g, refund_g, lo, hi)
+            r_steps = refund_steps.get(acct)
+            if r_steps is None:
+                continue
+            n_refund = (np.searchsorted(r_steps, hi, side="left")
+                        - np.searchsorted(r_steps, lo, side="left"))
             n_payment = self._windowed_sum_by_group(steps_g, payment_g, lo, hi)
             rho[idx] = n_refund / (n_payment + self.eps)
 

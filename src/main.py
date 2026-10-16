@@ -55,6 +55,7 @@ def run_simulation(fraud_probas: dict | None = None, verbose: bool = True) -> pd
                 engine._run_step_slot(step, slot_mask)
 
         injector.inject(step)
+        engine.end_of_step(step, params)
 
         if verbose and step % 50 == 0:
             print(f"step {step}/{N_STEPS}  {len(engine.log_step)} tx cumulées "

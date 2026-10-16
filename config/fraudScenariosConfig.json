@@ -1,6 +1,6 @@
 {
   "global": {
-    "fraud_target_min": 0.20,
+    "fraud_target_min": 0.2,
     "fraud_target_max": 0.26,
     "scenarios_equal_share": true
   },
@@ -32,12 +32,30 @@
     "T_split_min_sec": 60,
     "T_split_max_sec": 120,
     "tariff_grid": [
-      { "threshold": 0,      "commission": 0    },
-      { "threshold": 1000,   "commission": 50   },
-      { "threshold": 5000,   "commission": 150  },
-      { "threshold": 20000,  "commission": 400  },
-      { "threshold": 50000,  "commission": 750  },
-      { "threshold": 100000, "commission": 1200 }
+      {
+        "threshold": 0,
+        "commission": 0
+      },
+      {
+        "threshold": 1000,
+        "commission": 50
+      },
+      {
+        "threshold": 5000,
+        "commission": 150
+      },
+      {
+        "threshold": 20000,
+        "commission": 400
+      },
+      {
+        "threshold": 50000,
+        "commission": 750
+      },
+      {
+        "threshold": 100000,
+        "commission": 1200
+      }
     ]
   },
   "smurfing": {
@@ -53,5 +71,8 @@
     "operation_interval_days": 10,
     "n_leg_mule_min": 5,
     "n_leg_mule_max": 20
+  },
+  "legit_refund": {
+    "p_refund": 0.1
   }
 }

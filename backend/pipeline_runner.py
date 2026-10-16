@@ -145,8 +145,7 @@ def _run_simulation_bg(job_id: str, p: SimulationParams) -> None:
             injector.inject(step)
 
             # Rebalancement quotidien du float agent (toutes les 24 steps = 1 jour simulé)
-            if step % 24 == 0 and step > 0:
-                engine.rebalance_agents(params)
+            engine.end_of_step(step, params)
 
             if step % 30 == 0:
                 pct = 5 + int(80 * step / p.n_steps)

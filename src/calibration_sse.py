@@ -102,6 +102,7 @@ class SSEFraudCalibrator:
                     engine._run_step_slot(step, slot_mask)
 
             injector.inject(step)
+            engine.end_of_step(step, params)
 
         Ds = np.zeros((len(self.SCENARIOS), self.n_bins))
         if not engine.log_step:

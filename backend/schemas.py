@@ -70,6 +70,12 @@ class SmurfingConfig(BaseModel):
     n_leg_mule_max: int = Field(15, ge=1)
 
 
+class LegitRefundConfig(BaseModel):
+    # Part des PAYMENT légitimes remboursés par le marchand (ordre de grandeur :
+    # retours en magasin = 10,02 % des ventes, NRF & Appriss Retail, 2023).
+    p_refund: float = Field(0.10, ge=0.0, le=1.0)
+
+
 class FraudConfig(BaseModel):
     global_: GlobalConfig = Field(alias="global", default_factory=GlobalConfig)
     ato: ATOConfig = Field(default_factory=ATOConfig)
@@ -77,6 +83,7 @@ class FraudConfig(BaseModel):
     fake_credentials: FakeCredentialsConfig = Field(default_factory=FakeCredentialsConfig)
     split_deposit: SplitDepositConfig = Field(default_factory=SplitDepositConfig)
     smurfing: SmurfingConfig = Field(default_factory=SmurfingConfig)
+    legit_refund: LegitRefundConfig = Field(default_factory=LegitRefundConfig)
 
     model_config = {"populate_by_name": True}
 

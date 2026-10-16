@@ -385,8 +385,9 @@ class MoMTSimVisualizer:
         return fig
 
     def plot_smurfing_network_delta(self) -> go.Figure:
-        # delta_commission_ratio est calculé par compte nameOrig via merge_asof.
-        # Il faut filtrer sur is_mule_candidate (comptes détectés comme mules)
+        # delta_commission_ratio n'est porté que par les TRANSFER sortants appariés
+        # (merge_asof causal, cf. features.py).
+        # Il faut filtrer sur is_mule_candidate (transactions appariées comme mules)
         # plutôt que fraudScenario == "SMURFING" (qui inclut les transactions entrantes
         # fraudster→mule dont nameOrig n'est pas la mule, donc ratio = NaN).
         has_mule_col = "is_mule_candidate" in self.df.columns
@@ -576,7 +577,7 @@ class MoMTSimVisualizer:
                 split_df = self.df[(self.df["fraudScenario"] == "SPLIT_DEP") &
                                    (self.df["action"] == "CASH_IN")]
                 if len(split_df) > 0:
-                    variances = split_df.groupby(["step", "nameOrig"])["amount"].var().dropna().tolist()
+                    variances = split_df.groupby(["step", "nameOrig", "nameDest"])["amount"].var().dropna().tolist()
 
         fig = go.Figure()
         if variances:

@@ -138,6 +138,7 @@ class LiveProducer:
 
         params = TorchParameters(PARAM_DIR, FRAUD_CONFIG_PATH, n_clients=n_clients,
                                  seed=seed, volume_scale=volume_scale)
+        self._params = params
         self.engine = TorchMoMTSimEngine(
             params, n_clients=n_clients, n_merchants=cfg["n_merchants"],
             n_banks=N_BANKS, n_mules=n_mules, max_slots_per_step=MAX_SLOTS, seed=seed)
@@ -180,6 +181,7 @@ class LiveProducer:
         """Un step de simulation -> transactions brutes du step, en tuples."""
         self.engine.step_once(self.step)
         self.injector.inject(self.step)
+        self.engine.end_of_step(self.step, self._params)
         df = self.engine.flush_log()
         self.step += 1
         if df.empty:

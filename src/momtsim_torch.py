@@ -215,6 +215,19 @@ class TorchMoMTSimEngine:
         self.history_buf = torch.full((n_clients, 100), -1, dtype=torch.int64, device=DEVICE)
         self.history_ptr = torch.zeros(n_clients, dtype=torch.int64, device=DEVICE)
 
+        # Remboursements LÉGITIMES : une fraction p des PAYMENT légitimes réussis est
+        # remboursée par le marchand après un délai tiré dans la même loi que celle de
+        # la Refund Fraud (le délai ne doit pas, à lui seul, distinguer les deux).
+        # Sans eux, tout REFUND du journal serait frauduleux et le type de transaction
+        # révélerait l'étiquette. Valeur par défaut : 10 % -- ordre de grandeur des
+        # retours en magasin (10,02 % des ventes, NRF & Appriss Retail, 2023), à
+        # ajuster lors de la calibration.
+        fc = params.fraud_config
+        self.legit_refund_p = float(fc.get("legit_refund", {}).get("p_refund", 0.10))
+        self.refund_delay_min = int(fc.get("refund", {}).get("delay_min_hours", 1))
+        self.refund_delay_max = int(fc.get("refund", {}).get("delay_max_hours", 48))
+        self._pending_legit_refunds: dict = {}   # step -> liste de (marchand, client, montant)
+
         # historique des 10 derniers montants par (client, action) pour flag anomalie
         self.amount_hist = torch.zeros((n_clients, len(params.ACTIONS), 10),
                                         dtype=torch.float32, device=DEVICE)
@@ -418,7 +431,30 @@ class TorchMoMTSimEngine:
             self.log_is_flagged.extend([False] * active_np.sum())
             self.log_scenario.extend([None] * active_np.sum())
 
-    # 
+        # Planification des remboursements légitimes de PAYMENT réussis
+        if self.legit_refund_p > 0:
+            pay_j = self.params.ACTIONS.index("PAYMENT")
+            draw = torch.rand(n, generator=self.gen, device=DEVICE) < self.legit_refund_p
+            refunded = (active_out & (action_idx == pay_j) & draw).nonzero(as_tuple=True)[0]
+            if len(refunded) > 0:
+                delays = torch.randint(self.refund_delay_min, self.refund_delay_max + 1,
+                                       (len(refunded),), generator=self.gen, device=DEVICE)
+                for c, m, a, d in zip(orig_idx[refunded].tolist(), dest_idx[refunded].tolist(),
+                                      amounts[refunded].tolist(), delays.tolist()):
+                    self._pending_legit_refunds.setdefault(step + int(d), []).append((m, c, a))
+
+    def _flush_legit_refunds(self, step: int):
+        """Exécute les remboursements légitimes arrivés à échéance : REFUND émis par
+        le marchand au bénéfice du client, même convention que la Refund Fraud."""
+        due = [s for s in self._pending_legit_refunds if s <= step]
+        for s in sorted(due):
+            for merchant, client, amount in self._pending_legit_refunds.pop(s):
+                old_m, new_m, old_c, new_c, success = self.transfer(merchant, client, amount)
+                self.log_transaction(step, "REFUND", amount, merchant, client, old_m, new_m,
+                                     old_c, new_c, is_fraud=False, scenario=None,
+                                     success=success)
+
+    #
     def step_once(self, step: int):
         """Exécute un seul step à l'indice fourni.
 
@@ -504,6 +540,17 @@ class TorchMoMTSimEngine:
         self.log_is_flagged.append(is_flagged)
         self.log_scenario.append(scenario)
 
+    REBALANCE_EVERY_STEPS = 24   # cycle quotidien de réapprovisionnement du float
+
+    def end_of_step(self, step: int, params) -> None:
+        """À appeler après chaque step (moteur + injection), dans TOUS les régimes
+        d'exécution (calibration, génération des jeux, interface, flux live) pour
+        que le float des agents suive le même cycle quotidien partout, et que les
+        remboursements légitimes arrivés à échéance soient exécutés."""
+        self._flush_legit_refunds(step)
+        if step > 0 and step % self.REBALANCE_EVERY_STEPS == 0:
+            self.rebalance_agents(params)
+
     def rebalance_agents(self, params) -> None:
         """Réapprovisionne le float e-money des agents/banques toutes les 24 steps
         (simulation du cycle de rebalancement quotidien documenté par GSMA 2010).
@@ -574,22 +621,39 @@ class TorchFraudInjector:
         self._refund_cycle_count: int = 0
 
         # Smurfing : nombre de réseaux proportionnel aux mules disponibles
-        # (2 réseaux par mule en moyenne pour assurer suffisamment de volume)
+        # (2 réseaux par mule en moyenne pour assurer suffisamment de volume).
+        # Chaque réseau compte k mules (k ~ U[n_mules_min, n_mules_max]) de deux natures :
+        #   - mules CONSCIENTES : comptes mules dédiés (bloc MULE du moteur), entièrement
+        #     pilotés par l'émetteur ; sans activité propre dans le moteur, elles reçoivent
+        #     des transactions légitimes de couverture entre deux opérations (§3.2.5) ;
+        #   - mules INCONSCIENTES : comptes clients légitimes existants, compromis
+        #     (victimes d'hameçonnage), qui gardent leur activité légitime ordinaire.
+        # La part de conscientes est pct_conscious / (pct_conscious + pct_unconscious).
+        sm = self.cfg["smurfing"]
+        p_c = float(sm.get("pct_conscious", 1.0))
+        p_u = float(sm.get("pct_unconscious", 0.0))
+        share_conscious = p_c / (p_c + p_u) if (p_c + p_u) > 0 else 1.0
         n_networks = max(5, engine.n_mules * 2)
         self.smurf_networks = []
         for _ in range(n_networks):
             emitter = int(self.gen.choice(self.client_ids))
             receiver_pool = self.client_ids[self.client_ids != emitter]
             receiver = int(self.gen.choice(receiver_pool))
-            k = int(self.gen.integers(self.cfg["smurfing"]["n_mules_min"],
-                                       self.cfg["smurfing"]["n_mules_max"] + 1))
-            net_mules = self.gen.choice(self.mule_ids, size=min(k, len(self.mule_ids)), replace=False)
-            n_conscious = int(len(net_mules) * self.cfg["smurfing"]["pct_conscious"])
+            k = int(self.gen.integers(sm["n_mules_min"], sm["n_mules_max"] + 1))
+            n_conscious = min(int(round(k * share_conscious)), len(self.mule_ids))
+            conscious = self.gen.choice(self.mule_ids, size=n_conscious, replace=False)
+            victim_pool = self.client_ids[(self.client_ids != emitter) & (self.client_ids != receiver)]
+            unconscious = self.gen.choice(victim_pool, size=min(k - n_conscious, len(victim_pool)),
+                                          replace=False)
+            net_mules = np.concatenate([conscious, unconscious]).astype(np.int64)
             self.smurf_networks.append({
                 "emitter": emitter, "receiver": receiver, "mules": net_mules,
-                "conscious": set(net_mules[:n_conscious].tolist()),
+                "conscious": set(int(m) for m in conscious),
                 "next_op_step": int(self.gen.integers(0, 30 * 24)),
             })
+        # Transactions légitimes de couverture des mules conscientes : step -> [mules]
+        self._pending_legit: dict = {}
+        self._payment_idx = params.ACTIONS.index("PAYMENT")
 
         # Nombre d'injections fraude par step : proportionnel au nombre de mules
         # pour que le taux de fraude cible (~23%) soit atteignable par SPSA.
@@ -611,6 +675,18 @@ class TorchFraudInjector:
         self.engine.log_transaction(step, action, amount, orig, dest, old_o, new_o, old_d, new_d,
                                      is_fraud=True, is_flagged=flagged, scenario=scenario,
                                      success=success, time_s=time_s)
+        return success
+
+    def _log_cash_in(self, step, amount, client, agent, scenario, time_s=0.0):
+        """CASH_IN frauduleux journalisé avec la MÊME convention que les CASH_IN
+        légitimes du moteur (et de MoMTSim d'origine) : nameOrig = client crédité,
+        nameDest = agent. Le flux reste agent -> client (l'agent cède son float).
+        Journaliser l'agent en nameOrig ferait de l'orientation (et du solde de
+        l'émetteur, un float d'agent) un indicateur direct de l'étiquette."""
+        old_a, new_a, old_c, new_c, success = self.engine.transfer(agent, client, amount)
+        self.engine.log_transaction(step, "CASH_IN", amount, client, agent, old_c, new_c,
+                                    old_a, new_a, is_fraud=True, is_flagged=False,
+                                    scenario=scenario, success=success, time_s=time_s)
         return success
 
     def _log_legit(self, step, action, amount, orig, dest, time_s=0.0):
@@ -817,8 +893,7 @@ class TorchFraudInjector:
             times_s = [0.0]
 
         for frag, t_s in zip(fragments, times_s):
-            self._log(step, "CASH_IN", frag, agent, client, "SPLIT_DEP",
-                      time_s=t_s)
+            self._log_cash_in(step, frag, client, agent, "SPLIT_DEP", time_s=t_s)
         self._tracking["split_deposit"].append({
             "step": step, "agent": agent, "client": client,
             "n_frags": len(fragments), "total_amount": total_deposit,
@@ -880,11 +955,46 @@ class TorchFraudInjector:
                     "n_mules": len(chosen), "receiver": net["receiver"],
                     "total_x": total_emitted,
                 })
+                self._schedule_mule_cover(net, step)
+
+    def _schedule_mule_cover(self, net: dict, step: int):
+        """Planifie, pour chaque mule consciente du réseau, n_leg ~ U[n_leg_mule_min,
+        n_leg_mule_max] transactions légitimes réparties uniformément entre cette
+        opération et la suivante (§3.2.5) : elles donnent au compte mule dédié un
+        profil d'activité ordinaire. Les mules inconscientes, comptes clients réels,
+        ont déjà leur activité légitime propre dans le moteur."""
+        c = self.cfg["smurfing"]
+        lo, hi = step + 1, net["next_op_step"]
+        if hi <= lo:
+            return
+        for mule in net["conscious"]:
+            n_leg = int(self.gen.integers(c.get("n_leg_mule_min", 0),
+                                          c.get("n_leg_mule_max", 0) + 1))
+            for s in self.gen.integers(lo, hi, size=n_leg):
+                self._pending_legit.setdefault(int(s), []).append(int(mule))
+
+    def _flush_mule_cover(self, current_step: int):
+        """Exécute les transactions de couverture des mules conscientes arrivées à
+        échéance : PAYMENT légitime vers un marchand, montant tiré du profil PAYMENT
+        d'un client de la population, borné à 90 % du solde de la mule."""
+        due = [s for s in self._pending_legit if s <= current_step]
+        mules = [m for s in sorted(due) for m in self._pending_legit.pop(s)]
+        for mule in mules:
+            balance = float(self.engine.balance[mule].item())
+            ref = int(self.gen.choice(self.client_ids))
+            mu = float(self.params.mean_amount_tensor[ref, self._payment_idx].item())
+            sd = float(self.params.std_amount_tensor[ref, self._payment_idx].item())
+            amount = min(max(float(self.gen.normal(mu, sd)), 1.0), 0.9 * balance)
+            if amount < 1.0:
+                continue
+            merchant = int(self.gen.choice(self.merchant_ids))
+            self._log_legit(current_step, "PAYMENT", amount, mule, merchant)
 
     # 
     def inject(self, step: int):
         # Transactions différées traitées une seule fois par step
         self._flush_pending(step)
+        self._flush_mule_cover(step)
 
         # Boucle d'injection : _n_inject_per_step tirages indépendants par step.
         # ATO / REFUND / SPLIT_DEP scalent avec n_mules.
@@ -972,6 +1082,7 @@ if __name__ == "__main__":
                 engine._run_step_slot(step, slot_mask)
 
         injector.inject(step)
+        engine.end_of_step(step, params)
 
         if step % 50 == 0:
             print(f"step {step}/{N_STEPS}  {len(engine.log_step)} tx cumulées "
