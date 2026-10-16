@@ -42,23 +42,11 @@ def run_simulation(fraud_probas: dict | None = None, verbose: bool = True) -> pd
     injector = TorchFraudInjector(engine, params, fraud_probas=fraud_probas, seed=SEED)
 
     for step in range(N_STEPS):
-        n_tx_target = params.step_target_count[step]
-        n_tx_per_client = torch.distributions.Binomial(
-            total_count=n_tx_target.clamp(min=0),
-            probs=params.client_weight.clamp(0, 1)
-        ).sample()
-        n_tx_per_client = torch.clamp(n_tx_per_client, max=engine.max_slots).long()
-
-        for slot in range(engine.max_slots):
-            slot_mask = n_tx_per_client > slot
-            if slot_mask.any():
-                engine._run_step_slot(step, slot_mask)
-
-        injector.inject(step)
+        engine.simulate_step(step, injector)
 
         if verbose and step % 50 == 0:
-            print(f"step {step}/{N_STEPS}  {len(engine.log_step)} tx cumulées "
-                  f"({sum(engine.log_is_fraud)} frauduleuses)", flush=True)
+            print(f"step {step}/{N_STEPS}  {engine.n_logged} tx cumulées "
+                  f"({engine.n_fraud_logged} frauduleuses)", flush=True)
 
     return engine.to_dataframe()
 
@@ -68,12 +56,14 @@ def run_calibration() -> dict:
     """Lance la calibration SSE/SPSA (population réduite pour la vitesse)."""
     from calibration_sse import SSEFraudCalibrator
 
+    # Régime de calibration du mémoire (section 3.1.2) ; voir aussi momtsim_cli.py calibrer
     calib = SSEFraudCalibrator(
         param_dir=PARAM_DIR, fraud_config_path=FRAUD_CONFIG_PATH,
-        seed=SEED, n_clients=500, n_merchants=100, n_banks=10, n_mules=30,
-        target_mid=0.23, n_steps=N_STEPS, n_bins=30, n_seeds_per_eval=3)
+        seed=SEED, n_clients=2000, n_merchants=200, n_banks=8, n_mules=800,
+        target_mid=0.23, n_steps=N_STEPS, n_bins=30, n_seeds_per_eval=3,
+        max_slots_per_step=50)
 
-    result = calib.calibrate(maxiter=25)
+    result = calib.calibrate(maxiter=30)
     print("\nProbas calibrées :", result["probas"])
     print("SSE final :", result["sse_final"])
 
@@ -136,4 +126,6 @@ def main():
 
 
 if __name__ == "__main__":
+    import multiprocessing as _mp
+    _mp.freeze_support()
     main()

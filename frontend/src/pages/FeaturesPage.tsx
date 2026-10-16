@@ -52,14 +52,14 @@ export default function FeaturesPage() {
   return (
     <Layout
       title="Feature Engineering"
-      subtitle="12 features vectorisées  section 3.2.6 / éqs. 3.8–3.19"
+      subtitle="12 features vectorisées  section 3.4 / éqs. 3.8–3.19"
     >
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* ── Left panel ────────────────────────────────────────────── */}
         <div className="xl:col-span-1 space-y-4">
           <div className="card">
             <h2 className="section-title mb-0.5">Catalogue des features</h2>
-            <p className="text-xs text-text-muted mb-3">Formalisées en section 3.2.6</p>
+            <p className="text-xs text-text-muted mb-3">Formalisées en section 3.4</p>
             <div className="space-y-0.5">
               {Object.entries(FEATURE_META).map(([feat, meta]) => (
                 <div
@@ -99,7 +99,7 @@ export default function FeaturesPage() {
             Requiert rawLog_torch.parquet (simulation préalable)
           </p>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={onError} />
+          <JobTracker jobId={jobId} title="Calcul des 12 features" onDone={onDone} onError={onError} onRestart={launch} />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}

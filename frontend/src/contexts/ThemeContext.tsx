@@ -4,36 +4,24 @@ interface ThemeCtx {
   theme: "light";
 }
 
-const LIGHT_VARS: Record<string, string> = {
-  "--bg-primary-rgb":   "248 250 252",
-  "--bg-secondary-rgb": "255 255 255",
-  "--bg-card-rgb":      "255 255 255",
-  "--bg-hover-rgb":     "241 245 249",
-  "--text-primary-rgb": "15 23 42",
-  "--text-muted-rgb":   "71 85 105",
-  "--text-dim-rgb":     "148 163 184",
-  "--border-rgb":       "226 232 240",
-  "--border-hover-rgb": "37 99 235",
-  "--border-focus-rgb": "37 99 235",
-  "--scrollbar-track":  "#F1F5F9",
-  "--scrollbar-thumb":  "#CBD5E1",
-};
-
-function applyLight() {
-  const root = document.documentElement;
-  Object.entries(LIGHT_VARS).forEach(([prop, value]) => {
-    root.style.setProperty(prop, value);
-  });
-  root.style.backgroundColor = "#F8FAFC";
-  root.style.color = "#0F172A";
-  root.removeAttribute("data-theme");
-}
+/* Les couleurs sont définies par les variables CSS de index.css. On retire ici
+   d'éventuels styles en ligne posés par une version précédente de l'application. */
+const LEGACY_VARS = [
+  "--bg-primary-rgb", "--bg-secondary-rgb", "--bg-card-rgb", "--bg-hover-rgb",
+  "--text-primary-rgb", "--text-muted-rgb", "--text-dim-rgb",
+  "--border-rgb", "--border-hover-rgb", "--border-focus-rgb",
+  "--scrollbar-track", "--scrollbar-thumb",
+];
 
 const ThemeContext = createContext<ThemeCtx>({ theme: "light" });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    applyLight();
+    const root = document.documentElement;
+    LEGACY_VARS.forEach((v) => root.style.removeProperty(v));
+    root.style.removeProperty("background-color");
+    root.style.removeProperty("color");
+    root.removeAttribute("data-theme");
   }, []);
 
   return (

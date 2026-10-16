@@ -156,7 +156,7 @@ export default function KANPage() {
             Requiert featuresLog.csv (feature engineering préalable)
           </p>
 
-          <JobTracker jobId={jobId} onDone={onDone} onError={onError} />
+          <JobTracker jobId={jobId} title="Validation topologique KAN" onDone={onDone} onError={onError} />
         </div>
 
         {/* ── Results panel ─────────────────────────────────────────── */}

@@ -2,6 +2,7 @@ import type {
   FraudConfig, SimulationParams, CalibrationParams,
   Job, HealthStatus, BackupEntry,
   RunEntry, RunDetail, DataPage, FraudstersData,
+  CalibrationResult, DatasetEntry,
 } from "../types/api";
 
 const BASE = "/api";
@@ -28,6 +29,10 @@ export const restoreBackup = (name: string) =>
 
 //  Probas 
 export const getProbas = () => request<Record<string, number>>("/probas");
+
+//  Rapport de calibration / jeux générés 
+export const getCalibrationReport = () => request<CalibrationResult>("/calibration/report");
+export const getDatasets = () => request<DatasetEntry[]>("/datasets");
 
 //  Jobs 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);

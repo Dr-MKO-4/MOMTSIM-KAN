@@ -64,6 +64,10 @@ def load_calibrated_probas() -> dict | None:
 
 def save_calibrated_probas(probas: dict) -> str:
     p = _data / "calibrated_probas.json"
+    if p.exists():
+        _ensure_backup_dir()
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        shutil.copy2(p, BACKUP_DIR / f"calibrated_probas_{ts}.json")
     with open(p, "w", encoding="utf-8") as f:
         json.dump(probas, f, indent=2)
     return str(p)
@@ -77,12 +81,30 @@ _SIM_DEFAULTS: dict = {
     "n_mules": 300, "max_slots": 50, "n_steps": 720, "seed": 1000,
 }
 
+# Régime de calibration du mémoire (section 3.1.2)
 _CALIB_DEFAULTS: dict = {
-    "n_clients": 500, "n_merchants": 100, "n_banks": 10,
-    "n_mules": 300, "max_slots": 50,
+    "n_clients": 2000, "n_merchants": 200, "n_banks": 8,
+    "n_mules": 800, "max_slots": 50,
     "target_mid": 0.23, "n_steps": 720, "n_bins": 30,
     "n_seeds_per_eval": 3, "maxiter": 30, "lr": 0.05, "spsa_c": 0.02,
+    "volume_scale": 1.0, "volume_follow": False, "gain_schedule": "constant", "n_workers": 0,
 }
+
+CALIB_REPORT_PATH = _data / "calibration_report.json"
+
+
+def load_calibration_report() -> dict | None:
+    """Dernier résultat complet de calibration (θ*, historique, Dr, verdict)."""
+    if not CALIB_REPORT_PATH.exists():
+        return None
+    with open(CALIB_REPORT_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_calibration_report(result: dict) -> str:
+    with open(CALIB_REPORT_PATH, "w", encoding="utf-8") as f:
+        json.dump(result, f, ensure_ascii=False, indent=1, default=float)
+    return str(CALIB_REPORT_PATH)
 
 
 def load_sim_config() -> dict:
@@ -102,10 +124,8 @@ def save_sim_config(params: dict) -> str:
 
 def load_calib_config() -> dict:
     """Charge calib_config.json. max_slots et n_mules sont intentionnellement
-    indépendants de sim_config : la calibration utilise max_slots≥50 (volume légit
-    non capé) et n_mules=800 (gradient SPSA stable avec 2 000 clients). La simulation
-    utilise max_slots=3 et n_mules=3200 (réseau de mules proportionnel à 500 K clients
-    pour atteindre le MID cible de 23 %).
+    indépendants de sim_config : la calibration utilise max_slots=50 (volume légitime
+    non plafonné) et n_mules=800 (régime de calibration, section 3.1.2).
     """
     base = dict(_CALIB_DEFAULTS)
     if CALIB_CONFIG_PATH.exists():

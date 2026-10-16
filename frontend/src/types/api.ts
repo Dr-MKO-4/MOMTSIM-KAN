@@ -76,6 +76,9 @@ export interface SimulationParams {
   n_steps: number;
   max_slots: number;
   seed: number;
+  /** null = proportionné à la population (n_clients / 500 000, §3.1.2) */
+  volume_scale?: number | null;
+  volume_follow?: boolean;
   fraud_probas: Record<string, number> | null;
 }
 
@@ -92,17 +95,81 @@ export interface CalibrationParams {
   maxiter: number;
   lr: number;
   spsa_c: number;
+  volume_scale: number;
+  volume_follow: boolean;
+  gain_schedule: "constant" | "spall";
+  n_workers: number;
+  resume: boolean;
+  start_from_current: boolean;
 }
 
 export type JobStatus = "pending" | "running" | "done" | "error";
 
+export interface JobStage {
+  key: string;
+  label: string;
+  status: "pending" | "running" | "done" | "error";
+}
+
+export interface CalibrationHistoryEntry {
+  iter: number;
+  sse: number;
+  best_sse?: number;
+  theta: number[];
+  fraud_rate?: number;
+}
+
 export interface Job {
   job_id: string;
+  kind?: string;
   status: JobStatus;
   progress: number;
   message: string;
   result: Record<string, unknown> | null;
   error: string | null;
+  started_at?: number;
+  elapsed_s?: number;
+  eta_s?: number | null;
+  stage?: string | null;
+  stages?: JobStage[];
+  indeterminate?: boolean;
+  metrics?: Record<string, number | null | undefined>;
+  history?: CalibrationHistoryEntry[];
+}
+
+export type CheckLevel = "bloquant" | "attention" | "info" | "ok";
+
+export interface VerdictCheck {
+  level: CheckLevel;
+  title: string;
+  detail: string;
+  action?: string | null;
+}
+
+export interface Verdict {
+  verdict: "OK" | "ACCEPTABLE" | "RELANCER" | "A REFAIRE";
+  converged?: boolean;
+  summary?: string;
+  checks: VerdictCheck[];
+  metrics: Record<string, unknown>;
+  next_steps?: string[];
+}
+
+export interface EvalSummary {
+  sse: number;
+  Ds: number[][];
+  legit_bins: number[];
+  fraud_rate: number;
+  fraud_total: number;
+  legit_total: number;
+}
+
+export interface DatasetEntry {
+  name: "entrainement" | "validation" | "test";
+  config: Record<string, number | string | boolean>;
+  exists: boolean;
+  stale: boolean;
+  report: { verdict: string; n_transactions: number; fraud_rate: number; created_at: string } | null;
 }
 
 export interface SimulationResult {
@@ -112,6 +179,9 @@ export interface SimulationResult {
   steps_run: number;
   parquet_path: string;
   plain_summary?: string;
+  validation?: Verdict;
+  elapsed_sim_s?: number;
+  sim_params?: Record<string, number | boolean>;
   charts: Record<string, string>;
 }
 
@@ -141,7 +211,16 @@ export interface CalibrationResult {
   probas: Record<string, number>;
   sse_final: number;
   converged: boolean;
-  history: Array<{ iter: number; sse: number; theta: number[] }>;
+  history: CalibrationHistoryEntry[];
+  verdict?: Verdict;
+  theta0?: number[];
+  sse_theta0?: number | null;
+  sse_zero_fraud?: number;
+  best_eval?: EvalSummary | null;
+  Dr?: number[][];
+  config?: Record<string, number | string | boolean>;
+  elapsed_s?: number;
+  n_workers?: number;
 }
 
 export interface HealthStatus {

@@ -70,6 +70,12 @@ class SmurfingConfig(BaseModel):
     n_leg_mule_max: int = Field(15, ge=1)
 
 
+class LegitRefundConfig(BaseModel):
+    # Part des PAYMENT légitimes remboursés par le marchand (ordre de grandeur :
+    # retours en magasin = 10,02 % des ventes, NRF & Appriss Retail, 2023).
+    p_refund: float = Field(0.10, ge=0.0, le=1.0)
+
+
 class FraudConfig(BaseModel):
     global_: GlobalConfig = Field(alias="global", default_factory=GlobalConfig)
     ato: ATOConfig = Field(default_factory=ATOConfig)
@@ -77,6 +83,7 @@ class FraudConfig(BaseModel):
     fake_credentials: FakeCredentialsConfig = Field(default_factory=FakeCredentialsConfig)
     split_deposit: SplitDepositConfig = Field(default_factory=SplitDepositConfig)
     smurfing: SmurfingConfig = Field(default_factory=SmurfingConfig)
+    legit_refund: LegitRefundConfig = Field(default_factory=LegitRefundConfig)
 
     model_config = {"populate_by_name": True}
 
@@ -100,6 +107,10 @@ class SimulationParams(BaseModel):
     n_steps: int = Field(720, ge=24)
     max_slots: int = Field(6, ge=1)
     seed: int = Field(1000, ge=0)
+    # Facteur de volume légitime ; None = proportionné à la population
+    # (n_clients / 500 000, section 3.1.2)
+    volume_scale: Optional[float] = Field(None, gt=0)
+    volume_follow: bool = False
     fraud_probas: Optional[dict[str, float]] = None
 
 
@@ -151,18 +162,25 @@ class KANValidationResult(BaseModel):
 # 
 
 class CalibrationParams(BaseModel):
-    n_clients: int = Field(500, ge=50)
-    n_merchants: int = Field(100, ge=10)
-    n_banks: int = Field(10, ge=1)
-    n_mules: int = Field(300, ge=0)
+    # Régime de calibration du mémoire (section 3.1.2)
+    n_clients: int = Field(2000, ge=50)
+    n_merchants: int = Field(200, ge=10)
+    n_banks: int = Field(8, ge=1)
+    n_mules: int = Field(800, ge=0)
     max_slots: int = Field(50, ge=1)
     target_mid: float = Field(0.23, ge=0.1, le=0.5)
     n_steps: int = Field(720, ge=24)
     n_bins: int = Field(30, ge=5)
     n_seeds_per_eval: int = Field(3, ge=1)
-    maxiter: int = Field(25, ge=5, le=200)
+    maxiter: int = Field(30, ge=1, le=200)
     lr: float = Field(0.05, gt=0)
     spsa_c: float = Field(0.02, gt=0)
+    volume_scale: float = Field(1.0, gt=0)
+    volume_follow: bool = False
+    gain_schedule: str = Field("constant", pattern="^(constant|spall)$")
+    n_workers: int = Field(0, ge=0)          # 0 = automatique
+    resume: bool = False
+    start_from_current: bool = False         # partir de calibrated_probas.json
 
 
 class CalibrationResult(BaseModel):
@@ -170,3 +188,4 @@ class CalibrationResult(BaseModel):
     sse_final: float
     converged: bool
     history: list[dict[str, Any]]
+    verdict: Optional[dict[str, Any]] = None

@@ -133,7 +133,41 @@ def get_calibrated_probas():
     return p
 
 
-# 
+@app.get("/api/calibration/report", tags=["calibration"])
+def get_calibration_report():
+    """Dernier résultat complet de calibration et son verdict (faut-il relancer ?),
+    réévalué avec les fichiers de configuration et le code actuels."""
+    r = pr.calibration_report()
+    if r is None:
+        raise HTTPException(404, "Aucun rapport de calibration. Lancez la calibration d'abord.")
+    return r
+
+
+@app.get("/api/datasets", tags=["data"])
+def get_datasets():
+    """État des jeux entraînement/validation/test générés par momtsim_cli.py."""
+    import generation as gen
+    out = []
+    probas = cm.load_calibrated_probas()
+    for name in ("entrainement", "validation", "test"):
+        _, cfg = gen.load_dataset_config(name)
+        feat = gen.resolve_path(cfg["output"])
+        rep = feat.with_suffix(".rapport.json")
+        entry = {"name": name, "config": cfg, "exists": feat.exists(), "report": None,
+                 "stale": False}
+        if rep.exists():
+            import json as _json
+            data = _json.loads(rep.read_text(encoding="utf-8"))
+            entry["report"] = {"verdict": gen.validate_simulation(data)["verdict"],
+                               "n_transactions": data.get("n_transactions"),
+                               "fraud_rate": data.get("fraud_rate"),
+                               "created_at": data.get("created_at")}
+            entry["stale"] = probas is not None and data.get("fraud_probas") != probas
+        out.append(entry)
+    return out
+
+
+#
 # Jobs
 # 
 

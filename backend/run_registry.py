@@ -77,6 +77,9 @@ def register_run(job_id: str, run_type: str, result: dict) -> str:
         "converged":      result.get("converged"),
         "plain_summary":  result.get("plain_summary"),
         "sim_params":     result.get("sim_params"),
+        "verdict":        (result.get("verdict") or {}).get("verdict")
+                          if isinstance(result.get("verdict"), dict) else result.get("verdict"),
+        "dataset_verdict": (result.get("validation") or {}).get("verdict"),
     }
     summary = {k: v for k, v in summary.items() if v is not None}
 
