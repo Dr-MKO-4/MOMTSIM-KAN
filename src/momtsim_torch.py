@@ -1109,7 +1109,7 @@ class TorchFraudInjector:
     #
     def _run_refund(self, step: int):
         c = self.cfg["refund"]
-        if not self._refund_vuln_list or self._refund_merchant_idx >= len(self._refund_vuln_list):
+        if not self._refund_vuln_list:
             return
 
         # ratio_legit (défaut 0.30 §3.2.2) : probabilité de faire une tx légitime de camouflage
@@ -1137,7 +1137,10 @@ class TorchFraudInjector:
         # Compteur par marchand (k_max cycles avant de passer au marchand suivant)
         self._refund_cycle_count += 1
         if self._refund_cycle_count >= c["k_max"]:
-            self._refund_merchant_idx += 1
+            # Rotation cyclique dans le registre (§3.3.2) : arrivé au dernier marchand, le
+            # fraudeur repart du premier. Sans ce bouclage, le scénario s'arrêtait dès que
+            # le registre était épuisé (k_max x nombre de marchands cycles, soit quelques pas).
+            self._refund_merchant_idx = (self._refund_merchant_idx + 1) % len(self._refund_vuln_list)
             self._refund_cycle_count = 0
 
     #

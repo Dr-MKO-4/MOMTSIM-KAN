@@ -145,12 +145,12 @@ def interpret_calibration(result: dict, fraud_config_path=None,
     metrics["theta_rel_move"] = rel_move.tolist()
     gain0 = (sse0 - sse_star) / sse0 if sse0 and sse_star is not None and sse0 > 0 else None
     metrics["sse_gain_vs_theta0"] = gain0
-    if gain0 is not None and rel_move.max() < MOVE_MIN and gain0 < GAIN_MIN:
+    if gain0 is not None and gain0 < GAIN_MIN:
         grads = np.array([h["grad"] for h in result.get("history", []) if h.get("grad")])
         lr = cfg.get("lr")
         detail = (f"Déplacement maximal de theta : {rel_move.max():.1%} de la largeur des bornes ; "
                   f"gain de SSE par rapport au départ analytique : {gain0:.1%}. "
-                  "Le résultat est pratiquement le point de départ analytique.")
+                  "SPSA n'a presque rien apporté au départ analytique.")
         action = "Augmenter le pas a (lr) ou utiliser gain_schedule = spall."
         if len(grads) and lr:
             med = np.median(np.abs(grads), axis=0)
@@ -161,7 +161,7 @@ def interpret_calibration(result: dict, fraud_config_path=None,
                 action = (f"Le gradient estimé est faible devant l'échelle de la SSE normalisée : "
                           f"un pas a d'environ {a_sugg:.3g} (au lieu de {lr}) déplacerait chaque "
                           f"paramètre d'environ 5 % de sa plage par itération. Relancer avec ce pas.")
-        add("attention", "SPSA n'a presque pas déplacé theta", detail, action)
+        add("attention", "SPSA n'a presque pas amélioré theta", detail, action)
 
     # 5. Qualité de l'ajustement de la forme temporelle
     Ds = np.array(best.get("Ds")) if best.get("Ds") is not None else None
@@ -218,6 +218,15 @@ def interpret_calibration(result: dict, fraud_config_path=None,
         if Dr is not None:
             rel = np.sqrt(((Dr - Ds) ** 2).sum(axis=1)) / np.sqrt((Dr ** 2).sum(axis=1))
             metrics["scenario_rel_error"] = dict(zip(SCEN_LABELS, rel.tolist()))
+            ratio = Ds.sum(axis=1) / np.maximum(Dr.sum(axis=1), 1e-9)
+            metrics["scenario_volume_vs_target"] = dict(zip(SCEN_LABELS, ratio.tolist()))
+            absent = [f"{SCEN_LABELS[i]} ({ratio[i]:.1%} de sa cible)" for i in range(5)
+                      if i != 2 and ratio[i] < 0.10]
+            if absent:
+                add("bloquant", "Scénario quasi absent de la fraude simulée",
+                    "Volume simulé au meilleur point : " + ", ".join(absent) + ". La probabilité de "
+                    "déclenchement ne suffit pas à l'expliquer : le scénario ne se déclenche presque plus.",
+                    "Vérifier la logique du scénario dans momtsim_torch.py, puis relancer la calibration.")
         off = [f"{SCEN_LABELS[i]} {shares[i]:.0%}" for i in range(5)
                if i != 2 and abs(shares[i] - 0.2) > SHARE_TOL]
         if off:
