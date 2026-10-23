@@ -20,22 +20,117 @@ scénario sont tenus.
 """
 
 import os
+import time
 import numpy as np
 import torch
 import pandas as pd
 import json
 
 
-def _select_device() -> torch.device:
-    """cuda > mps > cpu, avec override manuel via MOMTSIM_DEVICE (cpu/cuda/mps)."""
-    forced = os.environ.get("MOMTSIM_DEVICE")
-    if forced:
-        return torch.device(forced)
+def _gpu_candidate() -> "str | None":
     if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+        return "cuda"
+    if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
+        return "mps"
+    return None
+
+
+def _sync(dev: torch.device):
+    if dev.type == "cuda":
+        torch.cuda.synchronize()
+    elif dev.type == "mps":
+        torch.mps.synchronize()
+
+
+def benchmark_slot(device: str, k: int = 4096, n_actors: int = 520_000, reps: int = 40) -> float:
+    """Durée moyenne (s) d'un créneau représentatif du moteur sur `device` : tirages,
+    gathers, comparaison à l'historique, mises à jour des soldes, retour des colonnes
+    du journal vers le CPU. Sert au choix automatique de l'appareil."""
+    import time
+    dev = torch.device(device)
+    g = torch.Generator(device=dev).manual_seed(0)
+    bal = torch.rand(n_actors, device=dev, generator=g) * 1e5
+    n_c = n_actors - 20_000
+    hist = torch.randint(0, n_c, (n_c, 100), device=dev, generator=g, dtype=torch.int32)
+    mean = torch.rand(n_c, 6, device=dev, generator=g) * 1e4
+    eq = torch.rand(n_c, device=dev, generator=g) * 1e5 + 1
+
+    def one():
+        idx = torch.randint(0, n_c, (k,), device=dev, generator=g)
+        b = bal[idx]
+        p = torch.clamp(0.5 * (1 + (eq[idx] - b) / eq[idx]), 0, 1)
+        w = torch.ones(k, 6, device=dev) * p.unsqueeze(1) + 1e-8
+        a = torch.multinomial(w, 1, generator=g).squeeze(1)
+        amt = torch.normal(mean[idx, a], mean[idx, a] * 0.1 + 1, generator=g).clamp(min=1)
+        dest = torch.randint(0, n_actors, (k,), device=dev, generator=g)
+        known = (hist[idx] == dest.to(torch.int32).unsqueeze(1)).any(1)
+        bal.index_add_(0, idx, -amt)
+        if dev.type == "cpu":
+            bal.index_add_(0, dest, amt)
+        else:
+            u, inv = torch.unique(dest.cpu(), return_inverse=True)
+            s = torch.zeros(len(u)).index_add_(0, inv, amt.cpu())
+            bal[u.to(dev)] += s.to(dev)
+        n = int(known.sum())
+        _ = (amt.cpu().numpy(), idx.cpu().numpy(), dest.cpu().numpy(), b.cpu().numpy(), n)
+
+    for _ in range(5):
+        one()
+    _sync(dev)
+    t0 = time.perf_counter()
+    for _ in range(reps):
+        one()
+    _sync(dev)
+    return (time.perf_counter() - t0) / reps
+
+
+def _auto_device() -> torch.device:
+    """CPU ou GPU selon une mesure faite une fois par machine (cache utilisateur)."""
+    import json
+    import platform
+    from pathlib import Path
+    gpu = _gpu_candidate()
+    if gpu is None:
+        return torch.device("cpu")
+    cache = Path.home() / ".cache" / "momtsim" / "device.json"
+    key = f"{platform.system()}|{platform.machine()}|torch {torch.__version__}|{gpu}"
+    try:
+        saved = json.loads(cache.read_text(encoding="utf-8"))
+        if saved.get("key") == key:
+            return torch.device(saved["device"])
+    except Exception:
+        pass
+    try:
+        t_cpu = benchmark_slot("cpu")
+        t_gpu = benchmark_slot(gpu)
+        # Le GPU n'est retenu que s'il est nettement plus rapide (20 %)
+        choice = gpu if t_gpu < 0.8 * t_cpu else "cpu"
+    except Exception:
+        t_cpu = t_gpu = None
+        choice = "cpu"
+    try:
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        tmp = cache.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"key": key, "device": choice, "cpu_s_par_creneau": t_cpu,
+                                   f"{gpu}_s_par_creneau": t_gpu}, indent=1), encoding="utf-8")
+        os.replace(tmp, cache)
+    except Exception:
+        pass
+    return torch.device(choice)
+
+
+def _select_device() -> torch.device:
+    """MOMTSIM_DEVICE = auto (défaut) | cpu | mps | cuda.
+
+    auto : CPU, sauf si un GPU (CUDA ou Apple MPS) est disponible ET plus rapide sur
+    un créneau représentatif du moteur, mesuré une fois par machine et gardé dans
+    ~/.cache/momtsim/device.json (supprimer ce fichier pour refaire la mesure).
+    Sur GPU, la mise à jour des soldes des contreparties est faite sans addition
+    concurrente, pour que deux exécutions de même graine restent identiques."""
+    forced = os.environ.get("MOMTSIM_DEVICE", "auto").strip().lower()
+    if forced and forced != "auto":
+        return torch.device(forced)
+    return _auto_device()
 
 
 DEVICE = _select_device()
@@ -148,7 +243,7 @@ class TorchParameters:
 
     def sample_agent_float(self, n: int, rng: "np.random.Generator | None" = None) -> np.ndarray:
         """Tire n valeurs de float initial pour les agents distributeurs/banques
-        selon agentFloatDistribution.csv  §3.2.4 du mémoire, \citet{gsma2010agents,ifc2017liquidity}."""
+        selon agentFloatDistribution.csv (GSMA 2010, IFC 2017 ; section 3.1.2 du mémoire)."""
         rng = self.rng if rng is None else rng
         lo = self.agent_float_df["range_min"].values
         hi = self.agent_float_df["range_max"].values
@@ -310,6 +405,13 @@ class TorchMoMTSimEngine:
         self._is_merchant_action = torch.tensor([a in ("CASH_IN", "PAYMENT") for a in A],
                                                 dtype=torch.bool, device=DEVICE)
         self._pay_j = A.index("PAYMENT")
+        self._deposit_j = A.index("DEPOSIT")
+        self._cash_in_j = A.index("CASH_IN")
+        # Contreparties des DEPOSIT : les banques (à défaut, les marchands)
+        if n_banks > 0:
+            self._bank_lo, self._bank_hi = self.BANK_OFFSET, self.BANK_OFFSET + n_banks
+        else:
+            self._bank_lo, self._bank_hi = self.MERCHANT_OFFSET, self.MERCHANT_OFFSET + n_merchants
 
         # Miroir NumPy du tenseur de soldes pour les opérations scalaires
         self._on_cpu = self.balance.device.type == "cpu"
@@ -326,6 +428,9 @@ class TorchMoMTSimEngine:
         self._legit_model = np.zeros((len(self.action_names), 0), dtype=np.int64)
         self._legit_other = np.zeros(0, dtype=np.int64)
         self._fraud_steps = np.zeros((len(self.scenario_names), 0), dtype=np.int64)
+        # Temps passé par phase (s), pour le diagnostic de performance
+        self.timings = {"binomiale": 0.0, "legitime": 0.0, "injection": 0.0,
+                        "fin_de_pas": 0.0, "pas": 0}
 
     # ── miroir hôte du tenseur de soldes ─────────────────────────────────────
     def host_balance(self) -> np.ndarray:
@@ -487,8 +592,18 @@ class TorchMoMTSimEngine:
         rand_merchant = torch.randint(self.n_clients, self.n_clients + self.n_merchants,
                                       (k,), generator=self.gen, device=DEVICE)
         rand_client = torch.randint(0, self.n_clients, (k,), generator=self.gen, device=DEVICE)
-        rand_new = torch.where(is_merchant, rand_merchant, rand_client)
-        dest = torch.where(use_history & (hist_choice >= 0), hist_choice, rand_new)
+        rand_bank = torch.randint(self._bank_lo, self._bank_hi, (k,), generator=self.gen, device=DEVICE)
+        # Une action entrante est servie par un agent qui cède son float : CASH_IN par un
+        # marchand, DEPOSIT par une banque. Jamais par un client : son solde, débité
+        # sans contrôle, deviendrait négatif (règle CEMAC : solde client >= 0).
+        is_deposit = action_idx == self._deposit_j
+        rand_new = torch.where(is_deposit, rand_bank, torch.where(is_merchant, rand_merchant, rand_client))
+        is_cash_in = action_idx == self._cash_in_j
+        hist_ok = (hist_choice >= 0) & torch.where(
+            is_cash_in, (hist_choice >= self.MERCHANT_OFFSET) & (hist_choice < self.BANK_OFFSET),
+            torch.where(is_deposit, (hist_choice >= self._bank_lo) & (hist_choice < self._bank_hi),
+                        torch.ones_like(is_deposit)))
+        dest = torch.where(use_history & hist_ok, hist_choice, rand_new)
         dest = torch.where(dest == idx, rand_new, dest)   # éviter l'auto-transaction
 
         # Solvabilité et flux
@@ -504,8 +619,18 @@ class TorchMoMTSimEngine:
         old_dest = bal[dest]
         signed = torch.where(active_in, amounts,
                              torch.where(active_out, -amounts, torch.zeros_like(amounts)))
-        bal.index_add_(0, idx, signed)      # client : + (IN) / - (OUT)
-        bal.index_add_(0, dest, -signed)    # contrepartie : - (IN, float agent) / + (OUT)
+        bal.index_add_(0, idx, signed)      # client : + (IN) / - (OUT), indices uniques
+        # contrepartie : - (IN, float agent) / + (OUT). Plusieurs clients peuvent viser
+        # le même marchand : sur CPU l'addition indexée est séquentielle (déterministe) ;
+        # sur GPU elle est concurrente, donc les sommes par contrepartie sont faites sur
+        # CPU puis appliquées à des indices uniques.
+        if self._on_cpu:
+            bal.index_add_(0, dest, -signed)
+        else:
+            u, inv = torch.unique(dest.cpu(), return_inverse=True)
+            sums = torch.zeros(len(u), dtype=bal.dtype).index_add_(0, inv, (-signed).cpu())
+            u_dev = u.to(DEVICE)
+            bal[u_dev] = bal[u_dev] + sums.to(DEVICE)
         self._device_written()
 
         # Mémorisation des nouveaux contacts (probabilité 0,9)
@@ -589,14 +714,18 @@ class TorchMoMTSimEngine:
         n_target = float(self.params.step_target_np[step % len(self.params.step_target_np)])
         if n_target <= 0:
             return
+        t0 = time.perf_counter()
         counts = torch.binomial(torch.full_like(self._w_cpu, n_target), self._w_cpu,
                                 generator=self._gen_cpu)
-        counts = counts.clamp_(max=self.max_slots).to(DEVICE)
+        counts.clamp_(max=self.max_slots)
+        # Seuls les clients actifs (quelques milliers) partent vers l'appareil de calcul
         active = (counts > 0).nonzero(as_tuple=True)[0]
+        c_act = counts[active]
+        self.timings["binomiale"] += time.perf_counter() - t0
         if active.numel() == 0:
             return
+        active, c_act = active.to(DEVICE), c_act.to(DEVICE)
         self._sync_device()
-        c_act = counts[active]
         for slot in range(self.max_slots):
             sel = c_act > slot
             if slot > 0:
@@ -608,10 +737,26 @@ class TorchMoMTSimEngine:
     def simulate_step(self, step: int, injector: "TorchFraudInjector | None" = None):
         """Un step complet, identique dans tous les régimes : volume légitime,
         injection de la fraude, fin de step (remboursements, float des agents)."""
+        t0 = time.perf_counter()
         self.step_once(step)
+        t1 = time.perf_counter()
         if injector is not None:
             injector.inject(step)
+        t2 = time.perf_counter()
         self.end_of_step(step)
+        t3 = time.perf_counter()
+        tm = self.timings
+        tm["legitime"] += (t1 - t0)
+        tm["injection"] += (t2 - t1)
+        tm["fin_de_pas"] += (t3 - t2)
+        tm["pas"] += 1
+
+    def timing_report(self) -> dict:
+        """Répartition du temps de simulation (s) : binomiale (comprise dans legitime),
+        créneaux légitimes, injection de la fraude, fin de pas."""
+        tm = dict(self.timings)
+        tm["creneaux"] = max(0.0, tm["legitime"] - tm["binomiale"])
+        return tm
 
     def run(self, n_steps: int = 720, verbose=True) -> pd.DataFrame:
         for step in range(n_steps):
@@ -690,9 +835,18 @@ class TorchMoMTSimEngine:
         time_s : secondes dans le step courant (précision intra-step pour ATO
                  et Split Deposit  cf. scénarios 3.2.1 et 3.2.4 du mémoire).
         """
-        act = self._act_code(action)
-        sc = self._scen_code(scenario)
-        self._ensure_cap(step)
+        # Chemin le plus appelé du module d'injection : accès directs aux tables
+        act = self._action_code.get(action)
+        if act is None:
+            act = self._act_code(action)
+        if scenario is None:
+            sc = -1
+        else:
+            sc = self._scenario_code.get(scenario)
+            if sc is None:
+                sc = self._scen_code(scenario)
+        if step >= self._cap:
+            self._ensure_cap(step)
         self.n_logged += 1
         if is_fraud:
             self.n_fraud_logged += 1
@@ -728,15 +882,16 @@ class TorchMoMTSimEngine:
     def transfer(self, orig_idx: int, dest_idx: int, amount: float) -> tuple:
         """Effectue un virement entre deux acteurs (indices globaux) sur le
         tenseur balance partagé, retourne (old_orig, new_orig, old_dest, new_dest, success)."""
-        hb = self.host_balance()
+        hb = self._host if self._host_valid else self.host_balance()
         old_orig = float(hb[orig_idx])
         old_dest = float(hb[dest_idx])
-        can_pay = (old_orig - amount) >= self._floor_np[orig_idx]
-        if can_pay:
+        if (old_orig - amount) >= self._floor_np[orig_idx]:
             hb[orig_idx] = old_orig - amount
             hb[dest_idx] = hb[dest_idx] + amount
-            self._host_written()
-        return old_orig, float(hb[orig_idx]), old_dest, float(hb[dest_idx]), bool(can_pay)
+            if not self._on_cpu:
+                self._device_stale = True
+            return old_orig, float(hb[orig_idx]), old_dest, float(hb[dest_idx]), True
+        return old_orig, old_orig, old_dest, old_dest, False
 
 
 #

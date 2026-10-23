@@ -280,6 +280,7 @@ def _run_dataset(name: str, with_features: bool, args) -> dict:
             raise
         bar.close(f"Simulation terminée en {fmt_duration(summary['elapsed_s'])}"
                   + (f" (reprise au pas {summary['resumed_from']})." if summary["resumed_from"] else "."))
+        _print_timings(summary.get("timings"))
         summary.pop("injector", None)
         # Rapport intermédiaire : si les features plantent, la simulation n'est pas à refaire
         gen.save_report(summary, gen.validate_simulation(summary), raw_report_path)
@@ -311,7 +312,133 @@ def _run_dataset(name: str, with_features: bool, args) -> dict:
     return report
 
 
-def _datasets(jeu: str) -> list[str]:
+def _print_timings(tm: dict | None):
+    """Répartition du temps de simulation : montre où part le temps sur cette machine."""
+    if not tm:
+        return
+    parts = [("créneaux légitimes", tm.get("creneaux", 0.0)), ("binomiale", tm.get("binomiale", 0.0)),
+             ("injection fraude", tm.get("injection", 0.0)), ("fin de pas", tm.get("fin_de_pas", 0.0)),
+             ("journal Parquet", tm.get("journal", 0.0)), ("sauvegardes", tm.get("sauvegardes", 0.0))]
+    total = sum(v for _, v in parts) or 1.0
+    print(f"  Temps par phase ({tm.get('device', '?')}) : "
+          + ", ".join(f"{name} {v / total:.0%}" for name, v in parts if v > 0))
+
+
+def _prepare(name: str, args) -> dict:
+    import generation as gen
+    label, cfg = gen.load_dataset_config(name)
+    if args.steps:
+        cfg["n_steps"] = args.steps
+    if args.graine is not None:
+        cfg["seed"] = args.graine
+    raw_path = gen.resolve_path(args.sortie_brut or cfg.get("raw_output", f"data/{label}_raw.parquet"))
+    feat_path = gen.resolve_path(cfg.get("output", f"data/{label}_features.parquet"))
+    probas = gen.load_probas()
+    return {"name": name, "label": label, "cfg": cfg, "raw": raw_path, "feat": feat_path,
+            "probas": probas, "sig": gen.run_signature(cfg, probas)}
+
+
+def _needs_simulation(prep: dict, args) -> bool:
+    import generation as gen
+    if getattr(args, "refaire", False):
+        return True
+    for rep_path, data_path in ((prep["feat"].with_suffix(".rapport.json"), prep["feat"]),
+                                (prep["raw"].with_suffix(".rapport.json"), prep["raw"])):
+        rep = gen.load_report(rep_path)
+        if rep and rep.get("signature") == prep["sig"] and data_path.exists():
+            return False
+    return True
+
+
+_PAR: dict = {"queue": None}
+
+
+def _par_init(queue, n_threads: int):
+    import torch
+    torch.set_num_threads(max(1, n_threads))
+    _PAR["queue"] = queue
+
+
+def _sim_worker(name: str, args) -> dict:
+    """Simulation d'un jeu dans un processus séparé (génération en parallèle)."""
+    import generation as gen
+    prep = _prepare(name, args)
+    q = _PAR["queue"]
+
+    def on_step(step, n_steps, n_tx, n_fraud):
+        if step % 5 == 0 or step == n_steps:
+            q.put((name, step, n_steps, n_tx, n_fraud))
+
+    summary = gen.simulate_to_parquet(
+        prep["cfg"], prep["probas"], prep["raw"], progress=on_step,
+        resume=not args.recommencer, checkpoint_every=args.sauvegarde,
+        archive=not args.sans_archive, log=lambda m: q.put((name, "log", m)))
+    summary.pop("injector", None)
+    gen.save_report(summary, gen.validate_simulation(summary), prep["raw"].with_suffix(".rapport.json"))
+    return {"name": name, "elapsed_s": summary["elapsed_s"], "timings": summary.get("timings")}
+
+
+def _parallel_simulations(names: list, args) -> None:
+    """Simule plusieurs jeux en même temps (un processus par jeu). Les features sont
+    calculées ensuite, l'une après l'autre, car elles demandent beaucoup de mémoire."""
+    from concurrent.futures import ProcessPoolExecutor, FIRST_COMPLETED, wait
+    preps = {n: _prepare(n, args) for n in names}
+    todo = [n for n in names if _needs_simulation(preps[n], args)]
+    if len(todo) < 2:
+        return
+    cores = os.cpu_count() or 2
+    n_proc = min(len(todo), args.parallele if args.parallele > 0 else max(1, cores // 2))
+    if n_proc < 2:
+        return
+    threads = max(1, cores // n_proc)
+    # Choix CPU/GPU fait (et mis en cache) une seule fois ici, pas en même temps dans chaque processus
+    import momtsim_torch
+    print(f"  appareil de calcul : {momtsim_torch.DEVICE}")
+    _title(f"Simulation en parallèle de {len(todo)} jeux ({n_proc} processus, {threads} threads chacun)")
+    ctx = mp.get_context("spawn")
+    queue = ctx.Queue()
+    total = sum(preps[n]["cfg"]["n_steps"] for n in todo)
+    done = {n: 0 for n in todo}
+    bar = ConsoleProgress(total, label="Simulations")
+    errors = {}
+    with ProcessPoolExecutor(max_workers=n_proc, mp_context=ctx, initializer=_par_init,
+                             initargs=(queue, threads)) as pool:
+        futures = {pool.submit(_sim_worker, n, args): n for n in todo}
+        pending = set(futures)
+        try:
+            while pending:
+                finished, pending = wait(pending, timeout=0.5, return_when=FIRST_COMPLETED)
+                while True:
+                    try:
+                        msg = queue.get_nowait()
+                    except Exception:
+                        break
+                    if msg[1] == "log":
+                        print(f"\n  [{msg[0]}] {msg[2]}")
+                    else:
+                        done[msg[0]] = msg[1]
+                for f in finished:
+                    n = futures[f]
+                    try:
+                        r = f.result()
+                        done[n] = preps[n]["cfg"]["n_steps"]
+                        print(f"\n  [{n}] simulation terminée en {fmt_duration(r['elapsed_s'])}")
+                        _print_timings(r.get("timings"))
+                    except Exception as exc:
+                        errors[n] = exc
+                        print(f"\n  [{n}] ERREUR : {exc!r} ; la relance reprendra au dernier point de sauvegarde")
+                bar.update(sum(done.values()),
+                           info=" | ".join(f"{n} {done[n] / preps[n]['cfg']['n_steps']:.0%}" for n in todo))
+        except KeyboardInterrupt:
+            bar.close(complete=False)
+            print("\nInterrompu. Relancer la même commande reprend chaque jeu à son dernier point de sauvegarde.")
+            raise
+    bar.close()
+    if errors:
+        print("Jeux en erreur : " + ", ".join(errors) + ". Les autres continuent avec les features.")
+
+
+def _datasets(jeu: str) -> list:
     return ["entrainement", "validation", "test"] if jeu == "tous" else [jeu]
 
 
@@ -330,14 +457,21 @@ def cmd_generer(args):
     if gen.load_probas() is None and not args.force:
         sys.exit("calibrated_probas.json introuvable : lancer d'abord la calibration "
                  "(ou --force pour générer avec les probabilités par défaut).")
+    if len(names) > 1 and args.parallele != 1:
+        _parallel_simulations(names, args)
     verdicts = {}
     for n in names:
-        verdicts[n] = _run_dataset(n, with_features=not args.sans_features, args=args)["verdict"]
+        try:
+            verdicts[n] = _run_dataset(n, with_features=not args.sans_features, args=args)["verdict"]
+        except KeyboardInterrupt:
+            raise
+        except Exception:
+            verdicts[n] = "ERREUR (relancer pour reprendre)"
     if len(verdicts) > 1:
         _title("Bilan")
         for n, v in verdicts.items():
             print(f"  {n:<14} {v}")
-    return 0 if all(v != "A REFAIRE" for v in verdicts.values()) else 2
+    return 0 if all(v not in ("A REFAIRE",) and not v.startswith("ERREUR") for v in verdicts.values()) else 2
 
 
 def cmd_valider(args):
@@ -457,10 +591,22 @@ def cmd_test_rapide(args):
     check(np.array_equal(counts[True], counts[False]),
           "mode compteurs (calibration) identique au mode journal à graine égale")
     check(df["fraudScenario"].dropna().isin(gen.SCEN_LABELS).all(), "scénarios valides")
-    check(bool((bal_clients >= -1e-2).all()), "soldes clients >= 0 (règle CEMAC)")
-    ok_rows = df[df["isSuccessful"] & ~df["action"].isin(["CASH_IN", "DEPOSIT"])]
-    check(bool(((ok_rows["oldBalanceOrig"] - ok_rows["newBalanceOrig"]) >= -1e-2).all()),
-          "les transactions sortantes réussies débitent l'émetteur")
+    # Transactions scalaires (fraude) : débit exact de l'émetteur. Les lignes légitimes
+    # vectorisées ne s'y prêtent pas : leur nouveau solde inclut tout le créneau.
+    fr = df[df["isFraud"] & df["isSuccessful"] & (df["action"] != "CASH_IN")
+            & (df["nameOrig"] != df["nameDest"])]
+    gap = (fr["oldBalanceOrig"] - fr["newBalanceOrig"] - fr["amount"]).abs()
+    tol = 1.0 + 1e-5 * fr["oldBalanceOrig"].abs()
+    check(bool((gap <= tol).all()), "transactions frauduleuses : débit exact de l'émetteur")
+    neg = int((bal_clients < -1e-2).sum())
+    check(neg == 0, f"soldes clients >= 0 en fin de simulation (règle CEMAC){'' if neg == 0 else f' : {neg} négatifs'}")
+    legit = df[~df["isFraud"]]
+    in_rows = legit[legit["action"].isin(["CASH_IN", "DEPOSIT"])]
+    check(bool((in_rows["nameDest"] >= n_c).all()),
+          "CASH_IN et DEPOSIT servis par un agent (marchand ou banque), jamais par un client")
+    client_rows = df[df["nameOrig"] < n_c]
+    check(bool((client_rows["newBalanceOrig"] >= -1e-2).all()),
+          "aucun solde client négatif dans le journal")
     check(df["step"].is_monotonic_increasing, "journal ordonné par pas")
     # Reprise : sauvegarde à mi-parcours, rechargement, fin identique à l'original
     import io
@@ -487,6 +633,72 @@ def cmd_test_rapide(args):
     print(f"  scénarios présents sur {n_steps} pas : {sorted(present)}")
     print("\nMoteur OK." if ok else "\nAu moins un contrôle a échoué.")
     return 0 if ok else 1
+
+
+# ── banc-essai ───────────────────────────────────────────────────────────────
+
+def cmd_banc_essai(args):
+    """Mesures sur cette machine : CPU contre GPU, temps par phase du moteur,
+    débit du calcul des features, estimation pour les jeux du mémoire."""
+    import tempfile
+    from pathlib import Path as _P
+    import numpy as np
+    cache = _P.home() / ".cache" / "momtsim" / "device.json"
+    if args.refaire_mesure and cache.exists():
+        cache.unlink()
+        print("Mesure de l'appareil effacée : elle sera refaite.")
+    import momtsim_torch as mt
+    import generation as gen
+
+    _title("1. Appareil de calcul")
+    gpu = mt._gpu_candidate()
+    print(f"  torch {mt.torch.__version__}, GPU disponible : {gpu or 'aucun'}, "
+          f"appareil retenu : {mt.DEVICE} (MOMTSIM_DEVICE={os.environ.get('MOMTSIM_DEVICE', 'auto')})")
+    t_cpu = mt.benchmark_slot("cpu")
+    print(f"  créneau type (4 096 clients actifs) sur CPU : {t_cpu * 1000:.2f} ms")
+    if gpu:
+        t_gpu = mt.benchmark_slot(gpu)
+        print(f"  créneau type sur {gpu}            : {t_gpu * 1000:.2f} ms "
+              f"({'GPU plus rapide' if t_gpu < t_cpu else 'CPU plus rapide'})")
+
+    _title("2. Moteur sur un régime réduit (proportions du mémoire)")
+    n_c = args.clients
+    cfg = gen.resolve_config({"n_clients": n_c, "n_merchants": round(n_c * 0.024), "n_banks": 8,
+                              "n_mules": round(n_c * 0.0042), "n_steps": args.pas, "max_slots": 3,
+                              "seed": 1000})
+    probas = gen.load_probas()
+    with tempfile.TemporaryDirectory() as tmp:
+        raw = _P(tmp) / "banc_raw.parquet"
+        bar = ConsoleProgress(cfg["n_steps"], label="Moteur")
+        summary = gen.simulate_to_parquet(cfg, probas, raw, progress=lambda s, n, t, f: bar.update(s),
+                                          checkpoint_every=10 ** 9, log=lambda m: None)
+        bar.close()
+        per_step = summary["elapsed_s"] / max(summary["steps_run"], 1)
+        print(f"  {n_c} clients, {cfg['n_mules']} mules : {per_step * 1000:.1f} ms par pas, "
+              f"{summary['n_transactions']:,} transactions".replace(",", " "))
+        _print_timings(summary["timings"])
+
+        _title("3. Calcul des features")
+        t0 = time.time()
+        n_rows = gen.compute_features(raw, _P(tmp) / "banc_feat.parquet", log=lambda m: None)
+        t_feat = time.time() - t0
+        print(f"  {n_rows:,} lignes en {t_feat:.1f} s ({n_rows / max(t_feat, 1e-9):,.0f} lignes/s)"
+              .replace(",", " "))
+
+    _title("4. Estimation pour les jeux du mémoire (extrapolation linéaire)")
+    from momtsim_torch import TorchParameters
+    ref = TorchParameters(str(PARAM_DIR), str(FRAUD_CONFIG), n_clients=10).step_target_np.mean()
+    for name in ("entrainement", "validation", "test"):
+        _, c = gen.load_dataset_config(name)
+        factor = c["n_clients"] / n_c                  # volume et mules proportionnels aux clients
+        sim_s = per_step * factor * c["n_steps"]
+        rows = ref * c["volume_scale"] * c["n_steps"] / (1 - 0.23)
+        feat_s = rows / max(n_rows / max(t_feat, 1e-9), 1e-9)
+        print(f"  {name:<13} simulation ~{fmt_duration(sim_s)}, features ~{fmt_duration(feat_s)} "
+              f"(~{rows / 1e6:.1f} M lignes)")
+    print("\n  Estimations indicatives : le coût réel croît un peu plus vite que linéairement "
+          "(tris des features en n log n).")
+    return 0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -535,6 +747,8 @@ def main(argv=None):
             s.add_argument("--force", action="store_true", help="autoriser l'absence de calibration")
             s.add_argument("--refaire", action="store_true",
                            help="régénérer même un jeu déjà complet et à jour")
+            s.add_argument("--parallele", type=int, default=0,
+                           help="jeux simulés en même temps (0 = auto selon les coeurs, 1 = un par un)")
         s.set_defaults(func=func)
 
     va = sub.add_parser("valider", help="relit le rapport d'un jeu généré")
@@ -544,6 +758,12 @@ def main(argv=None):
 
     sub.add_parser("etat", help="état du pipeline").set_defaults(func=cmd_etat)
     sub.add_parser("test-rapide", help="vérification courte du moteur").set_defaults(func=cmd_test_rapide)
+
+    b = sub.add_parser("banc-essai", help="mesures de performance sur cette machine")
+    b.add_argument("--clients", type=int, default=50_000, help="population du régime réduit")
+    b.add_argument("--pas", type=int, default=48, help="nombre de pas simulés")
+    b.add_argument("--refaire-mesure", action="store_true", help="refaire le choix CPU/GPU")
+    b.set_defaults(func=cmd_banc_essai)
 
     args = p.parse_args(argv)
     return args.func(args)

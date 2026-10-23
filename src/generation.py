@@ -213,6 +213,7 @@ def simulate_to_parquet(cfg: dict, fraud_probas: dict | None, raw_path: Path,
 
     cancelled = False
     steps_done = start
+    t_journal = t_ckpt = 0.0
     for step in range(start, n_steps):
         if cancel is not None and cancel():
             cancelled = True
@@ -220,11 +221,15 @@ def simulate_to_parquet(cfg: dict, fraud_probas: dict | None, raw_path: Path,
         engine.simulate_step(step, injector)
         steps_done = step + 1
         if steps_done % block_steps == 0 or steps_done == n_steps:
+            tj = time.perf_counter()
             df = engine.flush_log()
             table = pa.Table.from_pandas(df, schema=schema, preserve_index=False)
             pq.write_table(table, str(work / f"part_{steps_done:07d}.parquet"), compression="snappy")
+            t_journal += time.perf_counter() - tj
             if steps_done % checkpoint_every == 0 and steps_done < n_steps:
+                tc = time.perf_counter()
                 save_state(steps_done)
+                t_ckpt += time.perf_counter() - tc
         if progress is not None:
             progress(steps_done, n_steps, engine.n_logged, engine.n_fraud_logged)
 
@@ -250,6 +255,8 @@ def simulate_to_parquet(cfg: dict, fraud_probas: dict | None, raw_path: Path,
     return {
         "cancelled": cancelled, "steps_run": steps_done, "resumed_from": start,
         "elapsed_s": time.time() - t0, "signature": sig,
+        "timings": {**engine.timing_report(), "journal": t_journal, "sauvegardes": t_ckpt,
+                    "device": str(engine.balance.device)},
         "n_transactions": n_tx, "n_fraud": n_fraud,
         "fraud_rate": n_fraud / n_tx if n_tx else 0.0,
         "fraud_counts": dict(zip(SCEN_LABELS, fraud.sum(axis=1).astype(int).tolist())),

@@ -204,6 +204,10 @@ class SSEFraudCalibrator:
         # Les processus de travail importent calibration_sse et momtsim_torch depuis src/
         src = str(Path(__file__).parent)
         os.environ["PYTHONPATH"] = src + os.pathsep + os.environ.get("PYTHONPATH", "")
+        # Simulations de calibration : nombreuses et petites, donc un coeur CPU par
+        # processus est le plus efficace (pas de partage d'un GPU entre 9 processus)
+        self._prev_device = os.environ.get("MOMTSIM_DEVICE")
+        os.environ["MOMTSIM_DEVICE"] = "cpu"
         self._pool = ProcessPoolExecutor(max_workers=self.n_workers, mp_context=ctx,
                                          initializer=_init_worker,
                                          initargs=(self._queue, self._cancel_ev, 1))
@@ -212,6 +216,10 @@ class SSEFraudCalibrator:
         if self._pool is not None:
             self._pool.shutdown(wait=False, cancel_futures=True)
             self._pool = None
+            if getattr(self, "_prev_device", None) is None:
+                os.environ.pop("MOMTSIM_DEVICE", None)
+            else:
+                os.environ["MOMTSIM_DEVICE"] = self._prev_device
 
     def _cancelled(self) -> bool:
         return bool(self._cancel_check and self._cancel_check())
