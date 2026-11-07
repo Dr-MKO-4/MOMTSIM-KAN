@@ -65,7 +65,7 @@ function SseChart({ history, sseZero, sseTheta0, height = 220 }: Props) {
       {typeof sseTheta0 === "number" && (
         <g>
           <line x1={P.l} x2={W - P.r} y1={sy(sseTheta0)} y2={sy(sseTheta0)} stroke="#D97706" strokeWidth="1.2" strokeDasharray="2 3" />
-          <text x={W - P.r} y={sy(sseTheta0) - 4} textAnchor="end" fontSize="10" fill="#D97706">départ θ0</text>
+          <text x={W - P.r - 72} y={sy(sseTheta0) + 13} textAnchor="end" fontSize="10" fill="#D97706">départ θ0</text>
         </g>
       )}
       <path d={`${path(ys)} L${sx(xs[xs.length - 1])},${H - P.b} L${sx(xs[0])},${H - P.b} Z`} fill="url(#sse-area)" />
@@ -75,7 +75,7 @@ function SseChart({ history, sseZero, sseTheta0, height = 220 }: Props) {
       {[0, xMax].map((x) => (
         <text key={x} x={sx(x)} y={H - 8} textAnchor="middle" fontSize="10" fill="#94A3B8">{`it. ${x}`}</text>
       ))}
-      <g transform={`translate(${P.l + 8}, ${P.t + 6})`} fontSize="10" fill="#475569">
+      <g transform={`translate(${W - P.r - 210}, ${P.t + 6})`} fontSize="10" fill="#475569">
         <rect width="10" height="3" y="3" fill="#4F46E5" /><text x="14" y="8">meilleure SSE</text>
         <rect width="10" height="2" x="96" y="3" fill="#818CF8" /><text x="110" y="8">SSE de l'itération</text>
       </g>

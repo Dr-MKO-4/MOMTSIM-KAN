@@ -19,8 +19,9 @@ THETA_LABELS = ["p_ATO", "p_REFUND", "p_FAKE_CRED", "p_SPLIT_DEP", "alpha_SMURFI
 THETA_KEYS = ["ato", "refund", "fake_credentials", "split_deposit", "smurfing_freq_mult"]
 
 # Seuils de travail
-MOVE_MIN = 0.02          # déplacement relatif minimal de θ (fraction de la largeur des bornes)
-GAIN_MIN = 0.05          # gain relatif minimal de SSE entre θ0 et θ*
+Z_MIN = 2.0              # écart SSE(theta0)-SSE(theta*) jugé réel au-delà de Z_MIN erreurs-types
+                          # (jackknife sur les K réplications, cf. _sse_jackknife_se) ; en-deçà,
+                          # l'écart n'est pas distingable du bruit d'échantillonnage de SPSA
 TREND_MAX = 0.01         # gain relatif de SSE sur les 20 % dernières itérations au-delà duquel ça progresse encore
 FIT_BAD = 0.5            # SSE(θ*) / SSE(sans fraude) au-delà duquel la forme de la cible n'est pas reproduite
 SHARE_TOL = 0.05         # écart toléré à la part égale (20 %) par scénario
@@ -54,6 +55,7 @@ def interpret_calibration(result: dict, fraud_config_path=None,
                           check_staleness: bool = True) -> dict:
     """Retourne {verdict, converged, summary, checks[], metrics{}, next_steps[]}."""
     checks: list[dict] = []
+    relaunch: list[str] = []   # options de `calibrer` qui appliquent les actions proposées
 
     def add(level, title, detail, action=None):
         checks.append({"level": level, "title": title, "detail": detail, "action": action})
@@ -115,6 +117,8 @@ def interpret_calibration(result: dict, fraud_config_path=None,
         if not (lo_t <= fr <= hi_t):
             odds_t, odds = target_mid / (1 - target_mid), fr / max(1e-9, 1 - fr)
             sugg = int(round(n_mules * odds_t / odds)) if n_mules and odds > 0 else None
+            if sugg:
+                relaunch += ["--n-mules", str(sugg)]
             add("bloquant", "Taux de fraude hors de la fourchette cible",
                 f"Taux de fraude simulé à theta* : {fr:.1%} (fourchette {lo_t:.0%} à {hi_t:.0%}).",
                 (f"Ajuster n_mules : estimation au premier ordre {sugg} au lieu de {n_mules} "
@@ -134,34 +138,50 @@ def interpret_calibration(result: dict, fraud_config_path=None,
         metrics["sse_gain_last_20pct"] = float(trend)
         still_improving = trend > TREND_MAX
         if still_improving:
+            relaunch.append("--depuis-theta-etoile")
             add("bloquant", "La SSE diminue encore en fin de calibration",
                 f"Gain de {trend:.1%} sur les 20 % dernières itérations "
                 f"(seuil de travail {TREND_MAX:.0%}).",
                 "Relancer en partant de theta* (option --depuis-theta-etoile) avec plus d'itérations.")
     converged = (not result.get("cancelled")) and len(history) >= 3 and not still_improving
 
-    # 4. θ a-t-il bougé ?
+    # 4. θ a-t-il bougé, et l'écart de SSE est-il réel ou du bruit d'échantillonnage ?
+    # Critère calculé (pas un seuil choisi a priori) : erreur-type de sse(D̄s) estimée par
+    # jackknife delete-one sur les K réplications (SSEFraudCalibrator._sse_jackknife_se),
+    # séparément en theta0 et en theta* ; écart jugé réel seulement au-delà de Z_MIN
+    # erreurs-types combinées (test z à deux échantillons indépendants).
     rel_move = np.abs(theta_star - theta0) / width
     metrics["theta_rel_move"] = rel_move.tolist()
+    se0 = (result.get("eval_theta0") or {}).get("sse_se")
+    se_star = best.get("sse_se")
     gain0 = (sse0 - sse_star) / sse0 if sse0 and sse_star is not None and sse0 > 0 else None
     metrics["sse_gain_vs_theta0"] = gain0
-    if gain0 is not None and gain0 < GAIN_MIN:
-        grads = np.array([h["grad"] for h in result.get("history", []) if h.get("grad")])
-        lr = cfg.get("lr")
-        detail = (f"Déplacement maximal de theta : {rel_move.max():.1%} de la largeur des bornes ; "
-                  f"gain de SSE par rapport au départ analytique : {gain0:.1%}. "
-                  "SPSA n'a presque rien apporté au départ analytique.")
-        action = "Augmenter le pas a (lr) ou utiliser gain_schedule = spall."
-        if len(grads) and lr:
-            med = np.median(np.abs(grads), axis=0)
-            med = np.where(med > 0, med, np.nan)
-            a_sugg = float(np.nanmedian(0.05 * width / med))
-            if np.isfinite(a_sugg):
-                metrics["lr_suggested"] = a_sugg
-                action = (f"Le gradient estimé est faible devant l'échelle de la SSE normalisée : "
-                          f"un pas a d'environ {a_sugg:.3g} (au lieu de {lr}) déplacerait chaque "
-                          f"paramètre d'environ 5 % de sa plage par itération. Relancer avec ce pas.")
-        add("attention", "SPSA n'a presque pas amélioré theta", detail, action)
+    if sse0 is not None and sse_star is not None and se0 is not None and se_star is not None \
+            and np.isfinite(se0) and np.isfinite(se_star):
+        combined_se = float(np.hypot(se0, se_star))
+        z = (sse0 - sse_star) / combined_se if combined_se > 0 else float("inf")
+        metrics["sse_gain_z"] = float(z)
+        if abs(z) < Z_MIN:
+            add("info", "Écart SSE(theta*) vs SSE(theta0) non significatif",
+                f"z = {z:.2f} (seuil |z| >= {Z_MIN:.0f}, étant donné l'erreur-type de sse estimée "
+                f"par jackknife sur K={cfg.get('n_seeds_per_eval', 3)} réplications : "
+                f"{se0:.2g} en theta0, {se_star:.2g} en theta*). Ni un gain ni une dégradation ne "
+                "sont distinguables du bruit d'échantillonnage de SPSA à ce niveau : ne pas changer "
+                "lr sur la seule foi de ce run.")
+        elif z < 0:
+            add("attention", "SPSA a dégradé theta par rapport au départ analytique",
+                f"z = {z:.2f} (seuil -{Z_MIN:.0f}), écart jugé réel, pas du bruit "
+                f"d'échantillonnage : SSE(theta*) = {sse_star:.4g} > SSE(theta0) = {sse0:.4g}.",
+                "Repartir de theta0 (--depuis-theta-etoile non applicable ici) et réduire lr "
+                "pour ce n_mules avant de relancer.")
+        else:
+            add("ok", "SPSA a amélioré theta de façon significative",
+                f"z = {z:.2f}, gain de SSE de {gain0:.1%} par rapport au départ analytique.")
+    elif gain0 is not None:
+        add("info", "Erreur-type de SSE indisponible pour ce rapport",
+            "Rapport produit avant l'ajout de l'estimation jackknife (sse_se) : le gain de SSE "
+            f"({gain0:.1%}) ne peut pas être distingué du bruit d'échantillonnage.",
+            "Relancer la calibration pour obtenir un rapport avec sse_se.")
 
     # 5. Qualité de l'ajustement de la forme temporelle
     Ds = np.array(best.get("Ds")) if best.get("Ds") is not None else None
@@ -194,6 +214,8 @@ def interpret_calibration(result: dict, fraud_config_path=None,
             add("attention", "Forme temporelle de la cible non reproduite", detail, action)
 
     # 6. Bornes et parts par scénario
+    fraud_low = fr is not None and fr < lo_t
+    fraud_high = fr is not None and fr > hi_t
     for i, name in enumerate(THETA_LABELS):
         at_lo = theta_star[i] <= lo_b[i] + BOUND_TOL * width[i]
         at_hi = theta_star[i] >= hi_b[i] - BOUND_TOL * width[i]
@@ -204,13 +226,26 @@ def interpret_calibration(result: dict, fraud_config_path=None,
                 "Saturation attendue : au plus un nouveau compte dormant par pas, réservoir de "
                 "200 comptes (section 3.1.6). Son débit plafonne indépendamment de p.")
         elif at_lo:
-            add("attention", f"{name} à sa borne basse",
-                "Le scénario produit déjà trop de fraude à la probabilité minimale.",
-                "Réduire n_mules (moins de tirages d'injection par pas).")
+            if fraud_low:
+                # Le taux de fraude global est déjà sous la cible (diagnostic 2, qui recommande
+                # d'augmenter n_mules) : rester au plancher est l'effet attendu, pas un signal
+                # contradictoire appelant à réduire n_mules.
+                add("info", f"{name} à sa borne basse",
+                    "Attendu tant que le taux de fraude global reste sous la cible : "
+                    "l'augmentation de n_mules recommandée ci-dessus devrait suffire.")
+            else:
+                add("attention", f"{name} à sa borne basse",
+                    "Le scénario produit déjà trop de fraude à la probabilité minimale.",
+                    "Réduire n_mules (moins de tirages d'injection par pas).")
         else:
-            add("attention", f"{name} à sa borne haute",
-                "Le scénario ne produit pas assez de fraude même à la probabilité maximale.",
-                "Augmenter n_mules.")
+            if fraud_high:
+                add("info", f"{name} à sa borne haute",
+                    "Attendu tant que le taux de fraude global dépasse la cible : la réduction "
+                    "de n_mules recommandée ci-dessus devrait suffire.")
+            else:
+                add("attention", f"{name} à sa borne haute",
+                    "Le scénario ne produit pas assez de fraude même à la probabilité maximale.",
+                    "Augmenter n_mules.")
 
     if Ds is not None and Ds.sum() > 0:
         shares = Ds.sum(axis=1) / Ds.sum()
@@ -245,9 +280,11 @@ def interpret_calibration(result: dict, fraud_config_path=None,
         verdict = "OK"
         summary = "Pas besoin de relancer : theta* peut être utilisé pour la génération."
 
+    if cfg.get("volume_follow"):
+        relaunch.append("--volume-follow")   # garder le même choix méthodologique
     next_steps = []
     if verdict == "RELANCER":
-        next_steps.append("python momtsim_cli.py calibrer")
+        next_steps.append(" ".join(["python momtsim_cli.py calibrer"] + relaunch))
     next_steps.append("python momtsim_cli.py generer --jeu tous")
     return {"verdict": verdict, "converged": bool(converged), "summary": summary,
             "checks": checks, "metrics": metrics, "next_steps": next_steps}

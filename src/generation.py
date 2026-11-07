@@ -4,11 +4,13 @@ jeux de données : simulation écrite par blocs de 50 pas, calcul des 12
 caractéristiques, rapport de validation du jeu produit.
 
 Régimes (section 3.1.2) :
-  - calibration  : 2 000 clients, 200 marchands, 8 banques, 800 mules, 720 pas ;
-  - entraînement : 500 000 clients, 12 000 marchands, 8 banques, 2 100 mules,
-                   1 440 pas, graine 1000 ;
-  - validation / test : 150 000 clients, 3 600 marchands, 8 banques, 630 mules,
-                   1 440 pas, graines 1001 et 1002.
+  - calibration  : 2 000 clients, 200 marchands, 8 banques, 4 757 mules, 720 pas,
+                   volume_follow=true (SPSA, cf. calibration_sse.py) ;
+  - entraînement : 500 000 clients, 12 000 marchands, 8 banques, 4 757 mules,
+                   1 440 pas, graine 1000, volume_follow=true ;
+  - validation / test : 150 000 clients, 3 600 marchands, 8 banques, 1 427 mules
+                   (4 757 x volume_scale), 1 440 pas, graines 1001 et 1002,
+                   volume_follow=true.
 Marchands (2,4 %) et mules (0,42 %) sont dans la même proportion des clients dans
 les trois jeux, et le volume horaire est proportionné à la population simulée
 (facteur n_clients / 500 000, population de référence des volumes horaires).
@@ -36,16 +38,16 @@ ACTIONS = ["CASH_IN", "CASH_OUT", "DEBIT", "PAYMENT", "TRANSFER", "DEPOSIT"]
 
 # Valeurs du mémoire (section 3.1.2), utilisées si le fichier de configuration manque
 REGIMES = {
-    "entrainement": {"n_clients": 500_000, "n_merchants": 12_000, "n_banks": 8, "n_mules": 2_100,
-                     "n_steps": 1_440, "max_slots": 3, "seed": 1000,
+    "entrainement": {"n_clients": 500_000, "n_merchants": 12_000, "n_banks": 8, "n_mules": 4_757,
+                     "n_steps": 1_440, "max_slots": 3, "seed": 1000, "volume_follow": True,
                      "raw_output": "MOMTSIM/config/rawLog_torch.parquet",
                      "output": "MOMTSIM/config/featuresLog.parquet"},
-    "validation":   {"n_clients": 150_000, "n_merchants": 3_600, "n_banks": 8, "n_mules": 630,
-                     "n_steps": 1_440, "max_slots": 3, "seed": 1001,
+    "validation":   {"n_clients": 150_000, "n_merchants": 3_600, "n_banks": 8, "n_mules": 1_427,
+                     "n_steps": 1_440, "max_slots": 3, "seed": 1001, "volume_follow": True,
                      "raw_output": "data/val_raw.parquet",
                      "output": "data/val_features.parquet"},
-    "test":         {"n_clients": 150_000, "n_merchants": 3_600, "n_banks": 8, "n_mules": 630,
-                     "n_steps": 1_440, "max_slots": 3, "seed": 1002,
+    "test":         {"n_clients": 150_000, "n_merchants": 3_600, "n_banks": 8, "n_mules": 1_427,
+                     "n_steps": 1_440, "max_slots": 3, "seed": 1002, "volume_follow": True,
                      "raw_output": "data/test_raw.parquet",
                      "output": "data/test_features.parquet"},
 }
@@ -278,7 +280,10 @@ def compute_features(raw_path: Path, features_path: Path, log=print, archive: bo
     import pandas as pd
     from features import FeatureEngineer
     log(f"Lecture du journal brut : {raw_path}")
-    df_raw = pd.read_parquet(raw_path)
+    # engine="fastparquet" : pyarrow 19.0.0 echoue a relire certains parquets
+    # ecrits par ce pipeline ("Repetition level histogram size mismatch",
+    # bug de lecture pyarrow, fichier intact) ; fastparquet fonctionne.
+    df_raw = pd.read_parquet(raw_path, engine="fastparquet")
     log(f"Calcul des 12 caractéristiques sur {len(df_raw):,} transactions (opération longue, "
         f"sans progression intermédiaire)...".replace(",", " "))
     t0 = time.time()

@@ -328,7 +328,7 @@ if __name__ == "__main__":
     from pathlib import Path as _Path
     _root = _Path(__file__).parent.parent
 
-    df_raw = pd.read_parquet(str(_root / "config" / "rawLog_torch.parquet"))
+    df_raw = pd.read_parquet(str(_root / "config" / "rawLog_torch.parquet"), engine="fastparquet")
     engineer = FeatureEngineer(df_raw)
     df_features = engineer.compute_all()
     df_features.to_parquet(str(_root / "config" / "featuresLog.parquet"), index=False)

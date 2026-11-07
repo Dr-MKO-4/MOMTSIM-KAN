@@ -32,6 +32,9 @@ def _gpu_candidate() -> "str | None":
         return "cuda"
     if getattr(torch.backends, "mps", None) is not None and torch.backends.mps.is_available():
         return "mps"
+    # Intel (Arc, Iris Xe) : nécessite une version de torch compilée pour XPU
+    if getattr(torch, "xpu", None) is not None and torch.xpu.is_available():
+        return "xpu"
     return None
 
 
@@ -40,6 +43,8 @@ def _sync(dev: torch.device):
         torch.cuda.synchronize()
     elif dev.type == "mps":
         torch.mps.synchronize()
+    elif dev.type == "xpu":
+        torch.xpu.synchronize()
 
 
 def benchmark_slot(device: str, k: int = 4096, n_actors: int = 520_000, reps: int = 40) -> float:
@@ -120,9 +125,9 @@ def _auto_device() -> torch.device:
 
 
 def _select_device() -> torch.device:
-    """MOMTSIM_DEVICE = auto (défaut) | cpu | mps | cuda.
+    """MOMTSIM_DEVICE = auto (défaut) | cpu | mps | cuda | xpu.
 
-    auto : CPU, sauf si un GPU (CUDA ou Apple MPS) est disponible ET plus rapide sur
+    auto : CPU, sauf si un GPU (CUDA, Apple MPS ou Intel XPU) est disponible ET plus rapide sur
     un créneau représentatif du moteur, mesuré une fois par machine et gardé dans
     ~/.cache/momtsim/device.json (supprimer ce fichier pour refaire la mesure).
     Sur GPU, la mise à jour des soldes des contreparties est faite sans addition
@@ -1322,7 +1327,8 @@ class TorchFraudInjector:
         lo, hi = step + 1, net["next_op_step"]
         if hi <= lo:
             return
-        for mule in net["conscious"]:
+        # sorted : l'ordre d'un set change après rechargement (pickle), pas celui-ci
+        for mule in sorted(net["conscious"]):
             n_leg = int(self.gen.integers(c.get("n_leg_mule_min", 0),
                                           c.get("n_leg_mule_max", 0) + 1))
             for s in self.gen.integers(lo, hi, size=n_leg).tolist():

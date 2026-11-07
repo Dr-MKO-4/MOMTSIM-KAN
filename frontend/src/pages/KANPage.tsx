@@ -153,7 +153,7 @@ export default function KANPage() {
           </button>
 
           <p className="caption text-center">
-            Requiert featuresLog.csv (feature engineering préalable)
+            Requiert featuresLog.parquet (feature engineering préalable)
           </p>
 
           <JobTracker jobId={jobId} title="Validation topologique KAN" onDone={onDone} onError={onError} />
@@ -272,7 +272,7 @@ export default function KANPage() {
                 <PlotlyEmbed
                   html={result.charts.ks_summary}
                   title="Test KS par feature  D_KS vs seuil 0.15 (éq. 4.5)"
-                  height={400}
+                  height={480}
                 />
               )}
             </div>
@@ -280,7 +280,7 @@ export default function KANPage() {
             <EmptyState
               icon={Network}
               title="Aucun résultat disponible"
-              description="Lancez la validation topologique sur featuresLog.csv. Pipeline : normalisation → PCA → Fisher → KS → couverture → décision."
+              description="Lancez la validation topologique sur featuresLog.parquet. Pipeline : normalisation → PCA → Fisher → KS → couverture → décision."
             />
           )}
         </div>

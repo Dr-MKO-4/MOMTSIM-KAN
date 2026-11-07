@@ -272,16 +272,32 @@ class SSEFraudCalibrator:
     def _objective(self, results: dict, prefix: str) -> dict:
         """sse(θ) = Σ ((Dr - D̄s) / ΣDr)², avec D̄s moyen sur les K réplications."""
         reps = [results[f"{prefix}#{k}"] for k in range(self.n_seeds_per_eval)]
-        Ds_mean = np.mean([r["Ds"] for r in reps], axis=0)
+        Ds_reps = [r["Ds"] for r in reps]
+        Ds_mean = np.mean(Ds_reps, axis=0)
         legit_bins = np.mean([r["legit_bins"] for r in reps], axis=0)
         fraud_total = float(np.mean([r["fraud_total"] for r in reps]))
         legit_total = float(np.mean([r["legit_total"] for r in reps]))
         # Normalisation par ΣDr : gradient indépendant de l'échelle de la population
         sse = float(np.sum(((self._Dr - Ds_mean) / self._Dr_scale) ** 2))
         denom = fraud_total + legit_total
-        return {"sse": sse, "Ds": Ds_mean, "legit_bins": legit_bins,
+        return {"sse": sse, "sse_se": self._sse_jackknife_se(Ds_reps),
+                "Ds": Ds_mean, "legit_bins": legit_bins,
                 "fraud_rate": fraud_total / denom if denom > 0 else 0.0,
                 "fraud_total": fraud_total, "legit_total": legit_total}
+
+    def _sse_jackknife_se(self, Ds_reps: list) -> float:
+        """Erreur-type de sse(D̄s) estimée par jackknife delete-one sur les K réplications
+        (Tukey, 1958) : un calcul, pas un seuil arbitraire. Grossière à K=3 mais reproductible
+        et auditable -- sert de référence de bruit pour juger si un écart de SSE est réel."""
+        K = len(Ds_reps)
+        if K < 2:
+            return float("nan")
+        total = np.sum(Ds_reps, axis=0)
+        pseudo = np.array([
+            float(np.sum(((self._Dr - (total - Ds_reps[j]) / (K - 1)) / self._Dr_scale) ** 2))
+            for j in range(K)])
+        var = (K - 1) / K * float(np.sum((pseudo - pseudo.mean()) ** 2))
+        return float(np.sqrt(var))
 
     #
     def analytic_x0(self) -> np.ndarray:
@@ -394,8 +410,8 @@ class SSEFraudCalibrator:
                 if need_current:
                     ev = self._objective(results, "cur")
                     entry = history[-1]
-                    entry.update({"sse": ev["sse"], "fraud_rate": ev["fraud_rate"],
-                                  "elapsed_s": time.time() - t_start})
+                    entry.update({"sse": ev["sse"], "sse_se": ev.get("sse_se"),
+                                  "fraud_rate": ev["fraud_rate"], "elapsed_s": time.time() - t_start})
                     if ev["sse"] < best_sse:
                         best_sse, best_theta = ev["sse"], theta.copy()
                         state["best_eval"] = self._eval_summary(ev)
@@ -466,7 +482,7 @@ class SSEFraudCalibrator:
 
     @staticmethod
     def _eval_summary(ev: dict) -> dict:
-        return {"sse": ev["sse"], "Ds": np.asarray(ev["Ds"]).tolist(),
+        return {"sse": ev["sse"], "sse_se": ev.get("sse_se"), "Ds": np.asarray(ev["Ds"]).tolist(),
                 "legit_bins": np.asarray(ev["legit_bins"]).tolist(),
                 "fraud_rate": ev["fraud_rate"], "fraud_total": ev["fraud_total"],
                 "legit_total": ev["legit_total"]}

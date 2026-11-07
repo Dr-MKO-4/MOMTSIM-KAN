@@ -17,7 +17,9 @@ const IFRAME_BASE = `<!doctype html><html><head>
 </head><body>`;
 
 function PlotlyEmbed({ html, title, height = 480 }: Props) {
-  const srcdoc = `${IFRAME_BASE}${html}</body></html>`;
+  // L'empreinte d'intégrité générée par plotly ne correspond pas au fichier servi par le CDN :
+  // le navigateur bloquerait le script et le graphique resterait vide.
+  const srcdoc = `${IFRAME_BASE}${html.replace(/ integrity="[^"]*"/g, "")}</body></html>`;
 
   return (
     <div className="card p-0 overflow-hidden">

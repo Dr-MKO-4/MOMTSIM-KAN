@@ -73,7 +73,12 @@ class TopologyValidator:
         self.report["k_used"] = k
         return self.Z
 
-    # eq. 4.4
+    # eq. 4.4  critère de Fisher = distance de Mahalanobis au carré entre les centroïdes
+    # des deux classes, sous la covariance intra-classe COMMUNE (Fisher 1936 ; Duda, Hart &
+    # Stork 2001, §3.8.2). Correction du 03/11/2026 : l'ancienne version utilisait la matrice
+    # de dispersion S_W = S_0 + S_1 (somme sur les observations, pas une covariance) et
+    # divisait en plus par tr(S_W) ; J décroissait alors en 1/N^2 et valait ~1e-11 sur
+    # 100 000 transactions quelle que soit la séparation réelle (run du 08/08/2026).
     def fisher_index(self, Z: np.ndarray = None) -> float:
         Z = Z if Z is not None else self.Z
         if Z is None:
@@ -82,22 +87,27 @@ class TopologyValidator:
 
         Z0 = Z[self.y == 0]
         Z1 = Z[self.y == 1]
-        if len(Z0) == 0 or len(Z1) == 0:
+        n0, n1 = len(Z0), len(Z1)
+        if n0 < 2 or n1 < 2:
             self.report["J_Fisher"] = float("nan")
             return float("nan")
 
         mu0, mu1 = Z0.mean(axis=0), Z1.mean(axis=0)
         S0 = (Z0 - mu0).T @ (Z0 - mu0)
         S1 = (Z1 - mu1).T @ (Z1 - mu1)
-        Sw = S0 + S1
+        # Covariance intra-classe commune (pooled), indépendante de N et de la proportion
+        # de fraude de l'échantillon.
+        Sigma_w = (S0 + S1) / (n0 + n1 - 2)
 
-        Sw_inv = np.linalg.pinv(Sw)
+        Sigma_w_inv = np.linalg.pinv(Sigma_w)
         diff = (mu1 - mu0).reshape(-1, 1)
-        numerator = float((diff.T @ Sw_inv @ diff).item())
-        denominator = float(np.trace(Sw))
-        j_fisher = numerator / (denominator + self.eps)
+        j_fisher = float((diff.T @ Sigma_w_inv @ diff).item())
 
+        # Erreur de Bayes de deux gaussiennes de même covariance, à titre d'interprétation :
+        # Phi(-sqrt(J)/2) (Fukunaga 1990, §3.3). J > 1 <=> erreur < Phi(-0,5) ~ 0,31.
         self.report["J_Fisher"] = j_fisher
+        self.report["bayes_error_gauss"] = float(
+            0.5 * (1 + math.erf(-math.sqrt(max(j_fisher, 0.0)) / 2 / math.sqrt(2))))
         return j_fisher
 
     # eq. 4.5  test KS vs loi normale de référence
@@ -120,7 +130,9 @@ class TopologyValidator:
             if feat in BINARY_FEATURES:
                 continue
             col = self.X_norm[:, j]
-            sample = col if len(col) <= 5000 else np.random.choice(col, 5000, replace=False)
+            # Graine fixe : l'ancien np.random.choice global rendait D_KS non reproductible.
+            sample = col if len(col) <= 5000 else np.random.default_rng(42 + j).choice(
+                col, 5000, replace=False)
             ks_results[feat] = self._ks_statistic_vs_normal(sample)
         self.report["ks_per_feature"] = ks_results
         # ks_mean calculé sur les features continues uniquement (éq. 4.7 du mémoire)
