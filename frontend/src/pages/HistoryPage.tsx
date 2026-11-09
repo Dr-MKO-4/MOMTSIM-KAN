@@ -109,25 +109,25 @@ function RunCard({ run, onDelete, onResume }: {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {s.n_transactions !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">Transactions</p>
+                <p className="text-2xs text-text-dim mb-0.5">Transactions</p>
                 <p className="font-mono text-sm text-text-primary">{s.n_transactions.toLocaleString("fr-FR")}</p>
               </div>
             )}
             {s.fraud_rate !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">Taux fraude</p>
+                <p className="text-2xs text-text-dim mb-0.5">Taux fraude</p>
                 <p className="font-mono text-sm text-accent-fraud">{(s.fraud_rate * 100).toFixed(2)}%</p>
               </div>
             )}
             {s.n_rows !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">Lignes features</p>
+                <p className="text-2xs text-text-dim mb-0.5">Lignes features</p>
                 <p className="font-mono text-sm text-text-primary">{s.n_rows.toLocaleString("fr-FR")}</p>
               </div>
             )}
             {s.VE2 !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">VE₂</p>
+                <p className="text-2xs text-text-dim mb-0.5">VE₂</p>
                 <p className={`font-mono text-sm ${s.VE2 >= 0.4 ? "text-accent-green" : "text-accent-fraud"}`}>
                   {s.VE2.toFixed(3)}
                 </p>
@@ -135,7 +135,7 @@ function RunCard({ run, onDelete, onResume }: {
             )}
             {s.J_Fisher !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">J_Fisher</p>
+                <p className="text-2xs text-text-dim mb-0.5">J_Fisher</p>
                 <p className={`font-mono text-sm ${s.J_Fisher > 1 ? "text-accent-green" : "text-accent-fraud"}`}>
                   {s.J_Fisher.toFixed(3)}
                 </p>
@@ -143,7 +143,7 @@ function RunCard({ run, onDelete, onResume }: {
             )}
             {s.sse_final !== undefined && (
               <div>
-                <p className="text-2xs text-text-dim uppercase tracking-widest mb-0.5">SSE final</p>
+                <p className="text-2xs text-text-dim mb-0.5">SSE final</p>
                 <p className="font-mono text-sm text-text-primary">{s.sse_final.toFixed(1)}</p>
               </div>
             )}
@@ -151,7 +151,7 @@ function RunCard({ run, onDelete, onResume }: {
 
           {s.fraud_by_scenario && Object.keys(s.fraud_by_scenario).length > 0 && (
             <div className="mt-3">
-              <p className="text-2xs text-text-dim uppercase tracking-widest mb-1.5">Répartition fraude</p>
+              <p className="text-2xs text-text-dim mb-1.5">Répartition fraude</p>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(s.fraud_by_scenario).map(([sc, pct]) => (
                   <span key={sc} className="font-mono text-2xs text-text-muted">

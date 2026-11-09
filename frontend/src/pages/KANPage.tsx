@@ -166,13 +166,13 @@ export default function KANPage() {
               {/* Decision banner */}
               <div className="card flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <p className="text-2xs text-text-dim uppercase tracking-widest mb-1.5 font-mono">
+                  <p className="text-2xs text-text-dim mb-1.5 font-mono">
                     Décision  éq. 4.7
                   </p>
                   <DecisionBadge decision={result.decision} />
                 </div>
                 <div className="text-right">
-                  <p className="text-2xs text-text-dim uppercase tracking-widest mb-1">
+                  <p className="text-2xs text-text-dim mb-1">
                     k composantes pour VE80
                   </p>
                   <p className="font-mono text-2xl text-text-primary font-bold leading-none">

@@ -59,7 +59,7 @@ function TopBar({ title, subtitle, onMenuClick }: Props) {
   }, []);
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border/70 bg-white/75 backdrop-blur-md">
+    <header className="sticky top-0 z-10 border-b border-border/70 bg-white/75">
       <div className="flex items-center gap-4 px-5 lg:px-8 py-3.5">
         <button className="lg:hidden btn-icon" onClick={onMenuClick} aria-label="Ouvrir le menu">
           <Menu className="w-4 h-4" aria-hidden="true" />

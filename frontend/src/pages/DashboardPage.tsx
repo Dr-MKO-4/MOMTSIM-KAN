@@ -19,9 +19,9 @@ const PIPELINE = [
 
 const SCENARIOS = [
   { id: "ATO",       label: "Account Takeover", icon: ShieldAlert, cls: "text-accent-fraud bg-rose-50" },
-  { id: "REFUND",    label: "Refund Fraud",     icon: TrendingUp,  cls: "text-accent-blue bg-indigo-50" },
+  { id: "REFUND",    label: "Refund Fraud",     icon: TrendingUp,  cls: "text-accent-blue bg-orange-50" },
   { id: "FAKE_CRED", label: "Fake Credentials", icon: CreditCard,  cls: "text-accent-green bg-emerald-50" },
-  { id: "SPLIT_DEP", label: "Split Deposit",    icon: Split,       cls: "text-accent-purple bg-violet-50" },
+  { id: "SPLIT_DEP", label: "Split Deposit",    icon: Split,       cls: "text-accent-purple bg-stone-50" },
   { id: "SMURFING",  label: "Smurfing",         icon: Fish,        cls: "text-accent-amber bg-amber-50" },
 ] as const;
 
@@ -67,11 +67,10 @@ export default function DashboardPage() {
   return (
     <Layout title="Tableau de bord" subtitle="Simulation de fraude Mobile Money · zone CEMAC">
       {/* Bandeau */}
-      <section className="relative overflow-hidden rounded-3xl bg-brand-gradient p-6 lg:p-8 text-white shadow-soft mb-6">
-        <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
+      <section className="relative overflow-hidden rounded-xl bg-[#16181B] p-6 lg:p-8 text-white mb-6">
         <div className="relative grid gap-6 lg:grid-cols-[1fr_auto] items-center">
           <div>
-            <p className="text-xs uppercase tracking-wider opacity-80">MoMTSim adapté · PyTorch</p>
+            <p className="text-xs opacity-80">MoMTSim adapté en PyTorch</p>
             <h2 className="text-2xl font-semibold tracking-tight mt-1">Pipeline de génération des données</h2>
             <p className="text-sm opacity-85 mt-2 max-w-2xl leading-relaxed">
               Cinq scénarios de fraude injectés dans le modèle comportemental de MoMTSim, calibrés par SSE/SPSA
@@ -79,7 +78,7 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Link to="/calibration" className="btn-md bg-white text-accent-blue hover:bg-indigo-50 rounded-xl">
+            <Link to="/calibration" className="btn-md bg-white text-accent-blue hover:bg-orange-50 rounded-xl">
               <Target className="w-4 h-4" aria-hidden="true" /> Calibration
             </Link>
             <Link to="/simulation" className="btn-md bg-white/15 text-white hover:bg-white/25 rounded-xl ring-1 ring-white/30">
@@ -101,7 +100,7 @@ export default function DashboardPage() {
           </div>
           <ul className="divide-y divide-border-subtle">
             <li className="flex items-center gap-3 py-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-accent-blue"><Target className="w-4 h-4" aria-hidden="true" /></span>
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-accent-blue"><Target className="w-4 h-4" aria-hidden="true" /></span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium">Calibration</p>
                 <p className="text-xs text-text-muted truncate">
@@ -154,7 +153,7 @@ export default function DashboardPage() {
           {PIPELINE.map((p) => (
             <Link key={p.step} to={p.to} className="card-hover group" aria-label={`Étape ${p.step} : ${p.label}`}>
               <div className="flex items-center justify-between mb-3">
-                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-accent-blue group-hover:bg-brand-gradient group-hover:text-white transition-all">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-accent-blue group-hover:bg-brand-gradient group-hover:text-white transition-all">
                   <p.icon className="w-4 h-4" aria-hidden="true" />
                 </span>
                 <span className="text-2xs font-mono text-text-dim">{p.section}</span>

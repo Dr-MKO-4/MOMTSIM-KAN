@@ -19,7 +19,7 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 const BUBBLE_MAP: Record<string, string> = {
-  blue:    "bg-indigo-50 text-accent-blue",
+  blue:    "bg-orange-50 text-accent-blue",
   green:   "bg-emerald-50 text-accent-green",
   red:     "bg-rose-50 text-accent-fraud",
   amber:   "bg-amber-50 text-accent-amber",

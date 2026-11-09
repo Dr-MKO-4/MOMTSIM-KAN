@@ -36,7 +36,7 @@ const THETA = [
 ] as const;
 
 const SCEN = ["ATO", "REFUND", "FAKE_CRED", "SPLIT_DEP", "SMURFING"];
-const SCEN_COLOR = ["#E11D48", "#4F46E5", "#059669", "#7C3AED", "#D97706"];
+const SCEN_COLOR = ["#E11D48", "#CD4918", "#059669", "#2A2E32", "#D97706"];
 
 const fmtSse = (v: number | null | undefined) =>
   v === null || v === undefined || !isFinite(v) ? "–" : v < 0.01 ? v.toExponential(3) : v.toFixed(4);

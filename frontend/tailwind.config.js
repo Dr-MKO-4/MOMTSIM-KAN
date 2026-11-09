@@ -12,12 +12,12 @@ export default {
           sunken:    "rgb(var(--bg-sunken-rgb)     / <alpha-value>)",
         },
         accent: {
-          blue:   "#4F46E5",
-          sky:    "#0EA5E9",
+          blue:   "#CD4918",
+          sky:    "#6F747A",
           fraud:  "#E11D48",
           green:  "#059669",
           amber:  "#D97706",
-          purple: "#7C3AED",
+          purple: "#2A2E32",
         },
         text: {
           primary: "rgb(var(--text-primary-rgb) / <alpha-value>)",
@@ -34,29 +34,29 @@ export default {
           success: "#059669",
           warning: "#D97706",
           danger:  "#E11D48",
-          info:    "#4F46E5",
+          info:    "#2A2E32",
           muted:   "#94A3B8",
         },
       },
       fontFamily: {
-        sans: ["Inter", "Fira Sans", "system-ui", "sans-serif"],
+        sans: ["Segoe UI", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "Fira Code", "monospace"],
       },
       fontSize: {
         "2xs": ["0.68rem", { lineHeight: "1rem" }],
       },
       borderRadius: {
-        card: "1rem",
+        card: "0.5rem",
       },
       boxShadow: {
         card:         "0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06)",
-        "card-hover": "0 10px 30px -12px rgb(79 70 229 / 0.25), 0 4px 10px -4px rgb(15 23 42 / 0.08)",
+        "card-hover": "0 10px 30px -12px rgb(22 24 27 / 0.12), 0 4px 10px -4px rgb(15 23 42 / 0.08)",
         soft:         "0 8px 24px -12px rgb(15 23 42 / 0.18)",
-        glow:         "0 0 0 4px rgb(79 70 229 / 0.12)",
-        "focus-ring": "0 0 0 3px rgb(79 70 229 / 0.25)",
+        glow:         "0 0 0 4px rgb(205 73 24 / 0.12)",
+        "focus-ring": "0 0 0 3px rgb(205 73 24 / 0.25)",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #4F46E5 0%, #7C3AED 55%, #0EA5E9 100%)",
+        "brand-gradient": "linear-gradient(#CD4918, #CD4918)",
         "stripes":        "repeating-linear-gradient(45deg, rgb(255 255 255 / 0.22) 0 10px, transparent 10px 20px)",
       },
       keyframes: {

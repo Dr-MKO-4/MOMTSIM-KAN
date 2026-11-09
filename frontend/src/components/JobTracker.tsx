@@ -18,7 +18,7 @@ interface Props {
 
 const STATUS = {
   pending: { label: "En attente", icon: Clock,        tone: "gray"  as const, cls: "text-text-muted bg-slate-100" },
-  running: { label: "En cours",   icon: Loader2,      tone: "brand" as const, cls: "text-accent-blue bg-indigo-50" },
+  running: { label: "En cours",   icon: Loader2,      tone: "brand" as const, cls: "text-accent-blue bg-orange-50" },
   done:    { label: "Terminé",    icon: CheckCircle2, tone: "green" as const, cls: "text-accent-green bg-emerald-50" },
   error:   { label: "Erreur",     icon: XCircle,      tone: "red"   as const, cls: "text-accent-fraud bg-rose-50" },
 };
@@ -71,7 +71,7 @@ function StageStepper({ stages }: { stages: JobStage[] }) {
         return (
           <li key={s.key} className="flex items-center gap-1">
             <span className={`flex items-center gap-1.5 rounded-full px-2 py-1 text-2xs font-medium ${
-              s.status === "running" ? "bg-indigo-50 ring-1 ring-indigo-200" : ""}`}>
+              s.status === "running" ? "bg-orange-50 ring-1 ring-orange-200" : ""}`}>
               <Icon className={`w-3.5 h-3.5 ${cls} ${s.status === "running" ? "animate-spin-slow" : ""}`} aria-hidden="true" />
               <span className={s.status === "pending" ? "text-text-dim" : "text-text-muted"}>{s.label}</span>
             </span>
@@ -141,7 +141,7 @@ export default function JobTracker({ jobId, title, onDone, onError, onUpdate, on
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <span className={`relative flex h-8 w-8 items-center justify-center rounded-xl ${cfg.cls}`}>
-            {isRunning && <span className="absolute inset-0 rounded-xl bg-indigo-300/40 animate-ping-soft" aria-hidden="true" />}
+            {isRunning && <span className="absolute inset-0 rounded-xl bg-orange-300/40 animate-ping-soft" aria-hidden="true" />}
             <StatusIcon className={`relative w-4 h-4 ${job.status === "running" ? "animate-spin-slow" : ""}`} aria-hidden="true" />
           </span>
           <div className="min-w-0">

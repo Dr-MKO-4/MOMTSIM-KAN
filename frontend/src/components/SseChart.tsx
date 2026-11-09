@@ -44,8 +44,8 @@ function SseChart({ history, sseZero, sseTheta0, height = 220 }: Props) {
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Évolution de la SSE par itération">
       <defs>
         <linearGradient id="sse-area" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#4F46E5" stopOpacity="0.18" />
-          <stop offset="100%" stopColor="#4F46E5" stopOpacity="0" />
+          <stop offset="0%" stopColor="#CD4918" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#CD4918" stopOpacity="0" />
         </linearGradient>
       </defs>
       {ticks.map((t) => (
@@ -70,13 +70,13 @@ function SseChart({ history, sseZero, sseTheta0, height = 220 }: Props) {
       )}
       <path d={`${path(ys)} L${sx(xs[xs.length - 1])},${H - P.b} L${sx(xs[0])},${H - P.b} Z`} fill="url(#sse-area)" />
       <path d={path(ys)} fill="none" stroke="#818CF8" strokeWidth="1.5" />
-      <path d={path(best)} fill="none" stroke="#4F46E5" strokeWidth="2.4" strokeLinejoin="round" />
-      {ys.map((v, i) => <circle key={i} cx={sx(xs[i])} cy={sy(v)} r="2.4" fill="#4F46E5" />)}
+      <path d={path(best)} fill="none" stroke="#CD4918" strokeWidth="2.4" strokeLinejoin="round" />
+      {ys.map((v, i) => <circle key={i} cx={sx(xs[i])} cy={sy(v)} r="2.4" fill="#CD4918" />)}
       {[0, xMax].map((x) => (
         <text key={x} x={sx(x)} y={H - 8} textAnchor="middle" fontSize="10" fill="#94A3B8">{`it. ${x}`}</text>
       ))}
       <g transform={`translate(${W - P.r - 210}, ${P.t + 6})`} fontSize="10" fill="#475569">
-        <rect width="10" height="3" y="3" fill="#4F46E5" /><text x="14" y="8">meilleure SSE</text>
+        <rect width="10" height="3" y="3" fill="#CD4918" /><text x="14" y="8">meilleure SSE</text>
         <rect width="10" height="2" x="96" y="3" fill="#818CF8" /><text x="110" y="8">SSE de l'itération</text>
       </g>
     </svg>

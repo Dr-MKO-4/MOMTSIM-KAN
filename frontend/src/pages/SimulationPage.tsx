@@ -115,7 +115,7 @@ export default function SimulationPage() {
   return (
     <Layout title="Simulation MoMTSim" subtitle="Journal brut rawLog_torch.parquet · sections 3.1 et 3.3 du mémoire">
       {fromHistory && (
-        <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-50 ring-1 ring-indigo-200 text-xs text-accent-blue">
+        <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-50 ring-1 ring-orange-200 text-xs text-accent-blue">
           <RotateCcw className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
           Paramètres rechargés depuis l'historique : modifiez le nombre de pas pour prolonger la simulation, puis relancez.
         </div>
@@ -131,7 +131,7 @@ export default function SimulationPage() {
               {PRESETS.map((pr) => (
                 <button key={pr.key} onClick={() => applyPreset(pr.key)}
                   className={`text-left rounded-xl border px-3 py-2 transition-all duration-150 ${
-                    preset === pr.key ? "border-indigo-300 bg-indigo-50 shadow-glow" : "border-border hover:border-border-hover hover:bg-bg-hover"}`}>
+                    preset === pr.key ? "border-orange-300 bg-orange-50 shadow-glow" : "border-border hover:border-border-hover hover:bg-bg-hover"}`}>
                   <p className={`text-xs font-semibold ${preset === pr.key ? "text-accent-blue" : "text-text-primary"}`}>{pr.label}</p>
                   <p className="text-2xs text-text-dim leading-snug mt-0.5">{pr.hint}</p>
                 </button>

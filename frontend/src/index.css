@@ -6,20 +6,20 @@
 
 /* ─── Tokens CSS – thème clair ──────────────────────────────────────────── */
 :root {
-  --bg-primary-rgb:   246 247 251;
+  --bg-primary-rgb:   255 255 255;
   --bg-secondary-rgb: 255 255 255;
   --bg-card-rgb:      255 255 255;
-  --bg-hover-rgb:     241 243 249;
-  --bg-sunken-rgb:    238 241 247;
+  --bg-hover-rgb:     243 239 232;
+  --bg-sunken-rgb:    243 239 232;
 
-  --text-primary-rgb: 15  23  42;
-  --text-muted-rgb:   71  85  105;
-  --text-dim-rgb:     148 163 184;
+  --text-primary-rgb: 22  24  27;
+  --text-muted-rgb:   42  46  50;
+  --text-dim-rgb:     111 116 122;
 
-  --border-rgb:        226 230 240;
+  --border-rgb:        221 213 199;
   --border-subtle-rgb: 236 239 245;
-  --border-hover-rgb:  129 140 248;
-  --border-focus-rgb:  79  70  229;
+  --border-hover-rgb:  111 116 122;
+  --border-focus-rgb:  205 73  24;
 
   --scrollbar-track:  transparent;
   --scrollbar-thumb:  #CBD5E1;
@@ -28,7 +28,7 @@
 /* ─── Base ───────────────────────────────────────────────────────────────── */
 @layer base {
   html {
-    font-family: Inter, "Fira Sans", system-ui, sans-serif;
+    font-family: "Segoe UI", system-ui, sans-serif;
     background-color: rgb(var(--bg-primary-rgb));
     color: rgb(var(--text-primary-rgb));
     -webkit-font-smoothing: antialiased;
@@ -40,10 +40,6 @@
 
   body {
     @apply bg-bg-primary text-text-primary;
-    background-image:
-      radial-gradient(1200px 500px at 100% -10%, rgb(79 70 229 / 0.06), transparent 60%),
-      radial-gradient(900px 400px at -10% 110%, rgb(14 165 233 / 0.05), transparent 60%);
-    background-attachment: fixed;
   }
 
   code, pre, .mono {
@@ -56,7 +52,7 @@
     outline-offset: 2px;
   }
 
-  ::selection { background: rgb(79 70 229 / 0.18); }
+  ::selection { background: rgb(205 73 24 / 0.18); }
 
   ::-webkit-scrollbar       { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: var(--scrollbar-track); }
@@ -79,7 +75,7 @@
 
   /* ── Cards ──────────────────────────────────────────────────────────────── */
   .card {
-    @apply bg-bg-card border border-border/80 rounded-2xl p-5 shadow-card;
+    @apply bg-bg-card border border-border/80 rounded-lg p-5 shadow-card;
   }
   .card-hover {
     @apply card transition-all duration-200 cursor-pointer
@@ -162,11 +158,11 @@
     @apply inline-flex items-center gap-1 px-2 py-0.5 text-2xs rounded-full
            font-medium leading-none whitespace-nowrap;
   }
-  .badge-blue   { @apply badge bg-indigo-50  text-indigo-700  ring-1 ring-inset ring-indigo-200; }
+  .badge-blue   { @apply badge bg-orange-50  text-orange-800  ring-1 ring-inset ring-orange-200; }
   .badge-green  { @apply badge bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200; }
   .badge-red    { @apply badge bg-rose-50    text-rose-700    ring-1 ring-inset ring-rose-200; }
   .badge-amber  { @apply badge bg-amber-50   text-amber-700   ring-1 ring-inset ring-amber-200; }
-  .badge-purple { @apply badge bg-violet-50  text-violet-700  ring-1 ring-inset ring-violet-200; }
+  .badge-purple { @apply badge bg-stone-100 text-stone-800 ring-1 ring-inset ring-stone-300; }
   .badge-gray   { @apply badge bg-slate-100  text-slate-600   ring-1 ring-inset ring-slate-200; }
 
   /* ── Progress ────────────────────────────────────────────────────────────── */
@@ -192,7 +188,7 @@
   .section-subtitle { @apply text-xs text-text-muted leading-relaxed mb-4; }
   .card-title       { @apply text-sm font-semibold text-text-primary; }
   .metric-value     { @apply text-2xl font-semibold font-mono text-text-primary leading-none tracking-tight; }
-  .metric-label     { @apply text-2xs text-text-muted uppercase tracking-wider font-medium; }
+  .metric-label     { @apply text-2xs text-text-muted font-medium; }
   .caption          { @apply text-xs text-text-dim leading-relaxed; }
   .code-inline      { @apply font-mono text-xs bg-bg-sunken border border-border-subtle rounded-md px-1.5 py-0.5; }
 
@@ -201,7 +197,7 @@
 
   /* ── Tables ──────────────────────────────────────────────────────────────── */
   .table-th {
-    @apply text-left text-2xs uppercase tracking-wider text-text-dim
+    @apply text-left text-2xs text-text-dim
            py-2.5 px-3 font-semibold border-b border-border bg-bg-sunken/50;
   }
   .table-td {

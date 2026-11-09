@@ -16,7 +16,7 @@ function CommandBlock({ command, comment }: Props) {
   };
   return (
     <div className="group flex items-start gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-slate-100">
-      <Terminal className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-indigo-300" aria-hidden="true" />
+      <Terminal className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-300" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         {comment && <p className="text-2xs text-slate-400 mb-0.5">{comment}</p>}
         <code className="block text-xs font-mono break-all leading-relaxed">{command}</code>

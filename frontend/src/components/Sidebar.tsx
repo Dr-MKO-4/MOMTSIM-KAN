@@ -10,7 +10,7 @@ import {
   History,
   Database,
   X,
-  Sparkles,
+  Activity,
 } from "lucide-react";
 
 interface NavItem {
@@ -51,7 +51,7 @@ function Sidebar({ open, onClose }: Props) {
       className={[
         "fixed lg:sticky top-0 inset-y-0 left-0 z-30",
         "w-64 flex-shrink-0 flex flex-col h-screen",
-        "bg-white/90 backdrop-blur border-r border-border",
+        "bg-white/90 border-r border-border",
         "transition-transform duration-200 ease-out",
         open ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
       ].join(" ")}
@@ -61,7 +61,7 @@ function Sidebar({ open, onClose }: Props) {
       <div className="px-5 pt-5 pb-4 flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white shadow-soft">
-            <Sparkles className="w-4 h-4" aria-hidden="true" />
+            <Activity className="w-4 h-4" aria-hidden="true" />
           </span>
           <div>
             <p className="text-sm font-semibold text-text-primary leading-none tracking-tight">MoMTSim</p>
@@ -77,7 +77,7 @@ function Sidebar({ open, onClose }: Props) {
       <nav className="flex-1 px-3 pb-3 overflow-y-auto space-y-4" aria-label="Menu principal">
         {GROUPS.map((g) => (
           <div key={g.title}>
-            <p className="px-3 pb-1.5 text-2xs font-semibold uppercase tracking-wider text-text-dim select-none">
+            <p className="px-3 pb-1.5 text-2xs font-semibold text-text-dim select-none">
               {g.title}
             </p>
             <div className="space-y-0.5">
@@ -91,7 +91,7 @@ function Sidebar({ open, onClose }: Props) {
                     [
                       "group flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all duration-150",
                       isActive
-                        ? "bg-indigo-50 text-accent-blue font-medium shadow-[inset_0_0_0_1px_rgb(199_210_254)]"
+                        ? "bg-orange-50 text-accent-blue font-medium shadow-[inset_0_0_0_1px_rgb(199_210_254)]"
                         : "text-text-muted hover:text-text-primary hover:bg-bg-hover",
                     ].join(" ")
                   }

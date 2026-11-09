@@ -4,9 +4,9 @@ export type ProgressTone = "brand" | "green" | "red" | "amber" | "gray";
 
 const FILL: Record<ProgressTone, string> = {
   brand: "bg-brand-gradient",
-  green: "bg-gradient-to-r from-emerald-500 to-teal-400",
-  red:   "bg-gradient-to-r from-rose-600 to-rose-400",
-  amber: "bg-gradient-to-r from-amber-500 to-orange-400",
+  green: "bg-emerald-500",
+  red:   "bg-rose-600",
+  amber: "bg-amber-500",
   gray:  "bg-slate-300",
 };
 

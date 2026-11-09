@@ -19,7 +19,7 @@ export default function Layout({ title, subtitle, children }: Props) {
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-20 bg-slate-900/40 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-20 bg-slate-900/40 lg:hidden"
           onClick={closeSidebar}
           aria-hidden="true"
         />

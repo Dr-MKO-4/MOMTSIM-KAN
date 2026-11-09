@@ -4,16 +4,16 @@ import type { Verdict, CheckLevel } from "../types/api";
 import CommandBlock from "./ui/CommandBlock";
 
 const VERDICT_STYLE: Record<string, { title: string; icon: typeof ShieldCheck; cls: string; ring: string }> = {
-  OK:          { title: "Pas besoin de relancer", icon: ShieldCheck, cls: "from-emerald-500 to-teal-500", ring: "ring-emerald-200" },
-  ACCEPTABLE:  { title: "Utilisable, avec réserves", icon: ShieldAlert, cls: "from-amber-500 to-orange-500", ring: "ring-amber-200" },
-  RELANCER:    { title: "À relancer", icon: RefreshCcw, cls: "from-rose-600 to-pink-500", ring: "ring-rose-200" },
-  "A REFAIRE": { title: "Jeu à régénérer", icon: RefreshCcw, cls: "from-rose-600 to-pink-500", ring: "ring-rose-200" },
+  OK:          { title: "Pas besoin de relancer", icon: ShieldCheck, cls: "bg-emerald-700", ring: "ring-emerald-200" },
+  ACCEPTABLE:  { title: "Utilisable, avec réserves", icon: ShieldAlert, cls: "bg-amber-700", ring: "ring-amber-200" },
+  RELANCER:    { title: "À relancer", icon: RefreshCcw, cls: "bg-rose-700", ring: "ring-rose-200" },
+  "A REFAIRE": { title: "Jeu à régénérer", icon: RefreshCcw, cls: "bg-rose-700", ring: "ring-rose-200" },
 };
 
 const LEVEL: Record<CheckLevel, { icon: typeof Info; cls: string; label: string }> = {
   bloquant:  { icon: AlertTriangle, cls: "text-accent-fraud bg-rose-50",     label: "Bloquant" },
   attention: { icon: AlertTriangle, cls: "text-accent-amber bg-amber-50",    label: "Attention" },
-  info:      { icon: Info,          cls: "text-accent-blue bg-indigo-50",    label: "Info" },
+  info:      { icon: Info,          cls: "text-accent-blue bg-orange-50",    label: "Info" },
   ok:        { icon: CheckCircle2,  cls: "text-accent-green bg-emerald-50",  label: "OK" },
 };
 
@@ -33,12 +33,12 @@ function VerdictPanel({ verdict, title, commands }: Props) {
 
   return (
     <div className={`card p-0 overflow-hidden ring-1 ${st.ring}`}>
-      <div className={`bg-gradient-to-r ${st.cls} px-5 py-4 text-white flex items-center gap-3`}>
+      <div className={`${st.cls} px-5 py-4 text-white flex items-center gap-3`}>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
           <Icon className="w-5 h-5" aria-hidden="true" />
         </span>
         <div className="min-w-0">
-          <p className="text-2xs uppercase tracking-wider opacity-80">{title ?? "Verdict"}</p>
+          <p className="text-2xs opacity-80">{title ?? "Verdict"}</p>
           <p className="text-base font-semibold leading-tight">{verdict.verdict} · {st.title}</p>
         </div>
       </div>
