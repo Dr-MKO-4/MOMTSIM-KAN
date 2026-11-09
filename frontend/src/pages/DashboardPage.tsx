@@ -89,8 +89,8 @@ export default function DashboardPage() {
       </section>
 
       {/* État */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-5 mb-6">
-        <div className="card">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] gap-5 mb-6">
+        <div className="card min-w-0">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h2 className="section-title">État du pipeline</h2>

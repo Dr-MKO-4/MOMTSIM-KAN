@@ -19,7 +19,7 @@ function CommandBlock({ command, comment }: Props) {
       <Terminal className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-orange-300" aria-hidden="true" />
       <div className="min-w-0 flex-1">
         {comment && <p className="text-2xs text-slate-400 mb-0.5">{comment}</p>}
-        <code className="block text-xs font-mono break-all leading-relaxed">{command}</code>
+        <code className="block text-xs font-mono [overflow-wrap:anywhere] leading-relaxed">{command}</code>
       </div>
       <button
         className="flex-shrink-0 rounded-md p-1 text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
